@@ -3,10 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { AppError, errors } from "../domain";
 import { repoRoot } from "../config";
-import {
-  DemoSessionSchema,
-  HealthSchema,
-} from "../schemas";
+import { DemoSessionSchema, HealthSchema } from "../schemas";
 import { resolveApiKey } from "../services/auth";
 import { jobQueueDepth } from "../worker";
 
@@ -41,10 +38,6 @@ export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
-  /**
-   * Development convenience only. The seed script writes a gitignored key file
-   * so the console can offer one-click sign-in. Never available in production.
-   */
   app.get(
     "/v1/demo/session",
     {

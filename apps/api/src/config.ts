@@ -23,7 +23,6 @@ export interface AppConfig {
 
 const DEV_PEPPER = "dev-pepper-change-me";
 
-/** Repo root from both `src/` (tsx) and `dist/` (tsup bundle). */
 export const repoRoot = path.resolve(import.meta.dirname, "../../..");
 
 function resolveDbPath(value: string | undefined): string {
@@ -57,7 +56,10 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     workerPollMs: int(process.env.PAYFLOW_WORKER_POLL_MS, 400),
     workerLeaseSeconds: int(process.env.PAYFLOW_WORKER_LEASE_SECONDS, 60),
     maxJobAttempts: int(process.env.PAYFLOW_MAX_JOB_ATTEMPTS, 5),
-    allowSimulatorControls: bool(process.env.PAYFLOW_ALLOW_SIMULATOR_CONTROLS, env !== "production"),
+    allowSimulatorControls: bool(
+      process.env.PAYFLOW_ALLOW_SIMULATOR_CONTROLS,
+      env !== "production",
+    ),
     idempotencyTtlHours: int(process.env.PAYFLOW_IDEMPOTENCY_TTL_HOURS, 24),
     defaultPageSize: int(process.env.PAYFLOW_DEFAULT_PAGE_SIZE, 25),
     maxPageSize: int(process.env.PAYFLOW_MAX_PAGE_SIZE, 100),
@@ -65,8 +67,12 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       env === "production"
         ? (process.env.PAYFLOW_CORS_ORIGIN ?? false)
         : (process.env.PAYFLOW_CORS_ORIGIN ?? true),
-    rateLimitMax: int(process.env.PAYFLOW_RATE_LIMIT_MAX, env === "test" ? 100_000 : 600),
-    logLevel: process.env.PAYFLOW_LOG_LEVEL ?? (env === "test" ? "silent" : "info"),
+    rateLimitMax: int(
+      process.env.PAYFLOW_RATE_LIMIT_MAX,
+      env === "test" ? 100_000 : 600,
+    ),
+    logLevel:
+      process.env.PAYFLOW_LOG_LEVEL ?? (env === "test" ? "silent" : "info"),
     ...overrides,
   };
 
@@ -75,7 +81,9 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       throw new Error("PAYFLOW_API_KEY_PEPPER must be set in production");
     }
     if (config.allowSimulatorControls) {
-      throw new Error("PAYFLOW_ALLOW_SIMULATOR_CONTROLS must be false in production");
+      throw new Error(
+        "PAYFLOW_ALLOW_SIMULATOR_CONTROLS must be false in production",
+      );
     }
   }
 

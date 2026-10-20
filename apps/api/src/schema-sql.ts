@@ -1,9 +1,4 @@
-/**
- * Canonical schema. Kept as SQL so the constraints, checks and immutability
- * triggers are visible in one place. Drizzle definitions in schema.ts mirror it
- * for typed queries; both are exercised by the test suite.
- */
-export const SCHEMA_SQL = /* sql */ `
+export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS merchants (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

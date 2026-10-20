@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-  PAYMENT_STATUSES,
-  REFUND_STATUSES,
-  SCENARIOS,
-} from "./domain";
+import { PAYMENT_STATUSES, REFUND_STATUSES, SCENARIOS } from "./domain";
 
 const ISODate = z.string();
 

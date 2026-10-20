@@ -1,15 +1,8 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import type { AppConfig } from "./config";
-import type { Db } from "./db";import {
-  addPaymentEvent,
-  transitionPayment,
-} from "./services/payments";
-import {
-  claimNextJob,
-  completeJob,
-  enqueue,
-  failJob,
-} from "./services/jobs";
+import type { Db } from "./db";
+import { addPaymentEvent, transitionPayment } from "./services/payments";
+import { claimNextJob, completeJob, enqueue, failJob } from "./services/jobs";
 import {
   paymentJournalLines,
   postJournal,
@@ -56,11 +49,7 @@ interface JobPayload {
 }
 
 export function runOnce(ctx: WorkerContext): boolean {
-  const job = claimNextJob(
-    ctx.db,
-    ctx.workerId,
-    ctx.config.workerLeaseSeconds,
-  );
+  const job = claimNextJob(ctx.db, ctx.workerId, ctx.config.workerLeaseSeconds);
   if (!job) return false;
 
   ctx.logger?.info(
@@ -285,7 +274,6 @@ function applyPaymentOutcome(
       });
       return;
     case "error":
-      // Leave the payment in processing. The job retry creates a new attempt.
       return;
   }
 }
@@ -328,7 +316,11 @@ function latestReference(db: Db, paymentId: string): string | null {
 }
 
 function loadRefund(db: Db, refundId: string): RefundRow {
-  const refund = db.select().from(refunds).where(eq(refunds.id, refundId)).get();
+  const refund = db
+    .select()
+    .from(refunds)
+    .where(eq(refunds.id, refundId))
+    .get();
   if (!refund) throw new Error(`Refund ${refundId} does not exist.`);
   return refund;
 }
@@ -400,7 +392,6 @@ function reconcileRefund(ctx: WorkerContext, refundId: string): void {
   settleRefund(ctx.db, refundId, result);
 }
 
-/** Applies a terminal processor outcome. Returns true when unknown -> scheduled. */
 function settleRefund(
   db: Db,
   refundId: string,
@@ -436,7 +427,6 @@ function settleRefund(
       }
 
       if (result.outcome === "error") {
-        // Leave reserved capacity in place; the retry will reuse it.
         t.update(refunds)
           .set({ status: "reserved", updatedAt: now })
           .where(eq(refunds.id, refundId))
@@ -466,7 +456,6 @@ function settleRefund(
         return false;
       }
 
-      // Approved.
       t.update(refunds)
         .set({
           status: "succeeded",
@@ -554,10 +543,6 @@ function releaseReservation(tx: Db, refund: RefundRow): void {
   }
 }
 
-/**
- * Polling worker loop. Job claiming is atomic, so running more than one worker
- * process against the same database is safe.
- */
 export function startWorker(
   ctx: WorkerContext,
   options: { pollMs?: number; maxJobsPerTick?: number } = {},

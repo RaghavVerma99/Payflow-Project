@@ -118,7 +118,10 @@ export function encodeCursor(row: { createdAt: string; id: string }): string {
   );
 }
 
-export function decodeCursor(cursor: string): { createdAt: string; id: string } {
+export function decodeCursor(cursor: string): {
+  createdAt: string;
+  id: string;
+} {
   let decoded: string;
   try {
     decoded = Buffer.from(cursor, "base64url").toString("utf8");
@@ -168,11 +171,7 @@ export function parseScenario(value: string | undefined | null): Scenario {
   return value as Scenario;
 }
 
-export type SimulationOutcome =
-  | "succeeded"
-  | "declined"
-  | "timeout"
-  | "error";
+export type SimulationOutcome = "succeeded" | "declined" | "timeout" | "error";
 
 export interface SimulationResult {
   outcome: SimulationOutcome;
@@ -185,10 +184,6 @@ function hashToBucket(value: string): number {
   return digest.readUInt32BE(0) % 100;
 }
 
-/**
- * Deterministic processor double. The same reference always yields the same
- * result, which is what makes timeout reconciliation meaningful.
- */
 export function runSimulation(
   reference: string,
   scenario: Scenario,
@@ -242,7 +237,6 @@ function actualLookup(reference: string): SimulationResult {
     : { outcome: "declined", reference, failureCode: "card_declined" };
 }
 
-/** Reconciliation lookup for an operation whose outcome was unknown. */
 export function lookupSimulation(reference: string): SimulationResult {
   return actualLookup(reference);
 }

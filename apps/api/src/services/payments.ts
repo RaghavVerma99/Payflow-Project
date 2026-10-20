@@ -147,16 +147,18 @@ export function getPayment(
   const payment = db
     .select()
     .from(payments)
-    .where(
-      and(eq(payments.id, paymentId), eq(payments.merchantId, merchantId)),
-    )
+    .where(and(eq(payments.id, paymentId), eq(payments.merchantId, merchantId)))
     .get();
 
   if (!payment) throw errors.notFound("Payment");
   return payment;
 }
 
-export function getPaymentDetail(db: Db, merchantId: string, paymentId: string) {
+export function getPaymentDetail(
+  db: Db,
+  merchantId: string,
+  paymentId: string,
+) {
   const payment = getPayment(db, merchantId, paymentId);
 
   const attempts = db
@@ -260,7 +262,6 @@ export function transitionPayment(
     .run();
 
   if (result.changes !== 1) {
-    // Another writer moved it first; return the authoritative row.
     return tx.select().from(payments).where(eq(payments.id, paymentId)).get()!;
   }
 

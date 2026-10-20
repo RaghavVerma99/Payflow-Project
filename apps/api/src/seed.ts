@@ -3,7 +3,7 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { loadConfig, repoRoot } from "./config";
 import { createDb, type Db } from "./db";
-import { newId, nowIso } from "./domain";
+import { newId } from "./domain";
 import {
   merchants,
   paymentAttempts,
@@ -105,7 +105,8 @@ function seedDemo(db: Db, merchantId: string): DemoStats {
               currency: "INR",
               status: outcome,
               customerId: `cus_demo_${String(paymentCount + 1).padStart(3, "0")}`,
-              description: DESCRIPTIONS[Math.floor(rng() * DESCRIPTIONS.length)],
+              description:
+                DESCRIPTIONS[Math.floor(rng() * DESCRIPTIONS.length)],
               failureCode: failed ? "card_declined" : null,
               refundedMinor: refunded,
               refundReservedMinor: 0,
@@ -214,7 +215,6 @@ function seedDemo(db: Db, merchantId: string): DemoStats {
         }
       }
 
-      // Two live payments for the worker to pick up as soon as the API starts.
       for (const scenario of ["approve", "decline"] as const) {
         const id = newId("pay");
         const amount = (25 + Math.floor(rng() * 200)) * 100;
@@ -353,8 +353,7 @@ function main(): void {
           demo_key_file: keyFile,
           merchants: credentials,
           demo,
-          note:
-            "Store the API key now. Only a hash is kept in the database. Re-run seed for a fresh key.",
+          note: "Store the API key now. Only a hash is kept in the database. Re-run seed for a fresh key.",
         },
         null,
         2,

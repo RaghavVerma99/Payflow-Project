@@ -9,7 +9,11 @@ import {
   TimeseriesQuery,
   TimeseriesSchema,
 } from "../schemas";
-import { accountSummaries, listJournals, trialBalance } from "../services/ledger";
+import {
+  accountSummaries,
+  listJournals,
+  trialBalance,
+} from "../services/ledger";
 import { overview, timeseries } from "../services/stats";
 
 export const readRoutes: FastifyPluginAsyncZod = async (app) => {

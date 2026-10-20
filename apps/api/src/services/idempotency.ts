@@ -56,14 +56,6 @@ function isUniqueViolation(err: unknown): boolean {
   );
 }
 
-/**
- * Executes `work` at most once for a given (merchant, operation, key).
- *
- * The lookup, the record insert and the business write share one IMMEDIATE
- * transaction, so two writers cannot both observe "no record". A cross-process
- * race can still surface as a UNIQUE violation; that path re-reads the winner
- * and replays it instead of failing the caller.
- */
 export function withIdempotency<T>(
   db: Db,
   input: IdempotencyInput | null,

@@ -99,10 +99,6 @@ export interface PostJournalInput {
   createdAt?: string;
 }
 
-/**
- * Posts a balanced double-entry journal exactly once per (sourceType, sourceId).
- * Re-posting the same source is a no-op, which makes worker retries safe.
- */
 export function postJournal(
   db: Db,
   input: PostJournalInput,
@@ -136,7 +132,11 @@ export function postJournal(
   if (debits !== credits) {
     throw errors.invalid("Journal is not balanced.");
   }
-  if (input.lines.some((l) => !Number.isInteger(l.amountMinor) || l.amountMinor <= 0)) {
+  if (
+    input.lines.some(
+      (l) => !Number.isInteger(l.amountMinor) || l.amountMinor <= 0,
+    )
+  ) {
     throw errors.invalid("Every journal line must be a positive integer.");
   }
 
@@ -283,7 +283,10 @@ export function accountSummaries(db: Db, merchantId: string): AccountSummary[] {
   });
 }
 
-export function trialBalance(db: Db, merchantId: string): {
+export function trialBalance(
+  db: Db,
+  merchantId: string,
+): {
   debits_minor: number;
   credits_minor: number;
   balanced: boolean;
@@ -352,7 +355,10 @@ export function listJournals(
           : undefined,
       ),
     )
-    .orderBy(sql`${ledgerTransactions.createdAt} desc`, sql`${ledgerTransactions.id} desc`)
+    .orderBy(
+      sql`${ledgerTransactions.createdAt} desc`,
+      sql`${ledgerTransactions.id} desc`,
+    )
     .limit(options.limit + 1)
     .all();
 
@@ -415,9 +421,12 @@ export function listJournals(
   return {
     data,
     has_more: hasMore,
-    next_cursor: hasMore && last
-      ? Buffer.from(`${last.createdAt}|${last.id}`, "utf8").toString("base64url")
-      : null,
+    next_cursor:
+      hasMore && last
+        ? Buffer.from(`${last.createdAt}|${last.id}`, "utf8").toString(
+            "base64url",
+          )
+        : null,
   };
 }
 

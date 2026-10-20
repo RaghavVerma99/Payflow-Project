@@ -19,7 +19,9 @@ import {
 import { listRefundsForPayment } from "../services/refunds";
 import { serializePayment } from "../services/serializers";
 
-export function idempotencyKeyFrom(headers: Record<string, unknown>): string | null {
+export function idempotencyKeyFrom(
+  headers: Record<string, unknown>,
+): string | null {
   const raw = headers["idempotency-key"];
   if (raw === undefined) return null;
   if (typeof raw !== "string") {

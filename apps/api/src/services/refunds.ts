@@ -75,8 +75,6 @@ export function createRefund(
 
     const now = nowIso();
 
-    // Capacity is reserved with one conditional UPDATE. Two refunds racing for
-    // the last rupee cannot both succeed, regardless of process count.
     const reserved = t
       .update(payments)
       .set({
@@ -181,7 +179,9 @@ export function listRefunds(
     .where(
       and(
         eq(refunds.merchantId, options.merchantId),
-        options.paymentId ? eq(refunds.paymentId, options.paymentId) : undefined,
+        options.paymentId
+          ? eq(refunds.paymentId, options.paymentId)
+          : undefined,
         options.status ? eq(refunds.status, options.status) : undefined,
         cursor
           ? or(

@@ -51,7 +51,6 @@ export function cancelPendingJobs(tx: Db, aggregateId: string): number {
   return result.changes;
 }
 
-/** Lease expiry is the recovery path for a worker that crashed mid-job. */
 export function claimNextJob(
   db: Db,
   workerId: string,
@@ -69,9 +68,7 @@ export function claimNextJob(
           leaseExpiresAt: null,
           updatedAt: now,
         })
-        .where(
-          and(eq(jobs.status, "running"), lt(jobs.leaseExpiresAt, now)),
-        )
+        .where(and(eq(jobs.status, "running"), lt(jobs.leaseExpiresAt, now)))
         .run();
 
       const candidate = t

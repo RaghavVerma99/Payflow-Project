@@ -5,6 +5,7 @@ import fastifyStatic from "@fastify/static";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify, {
+  LogController,
   type FastifyInstance,
   type FastifyReply,
   type FastifyRequest,
@@ -47,8 +48,10 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
     genReqId: (request) =>
       (request.headers["x-request-id"] as string | undefined) ?? newId("req"),
     requestIdHeader: "x-request-id",
-    requestIdLogLabel: "request_id",
-    disableRequestLogging: config.env === "test",
+    logController: new LogController({
+      requestIdLogLabel: "request_id",
+      disableRequestLogging: config.env === "test",
+    }),
     trustProxy: config.env === "production",
     bodyLimit: 1024 * 1024,
   });

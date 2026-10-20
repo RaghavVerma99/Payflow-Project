@@ -17,6 +17,9 @@ declare module "fastify" {
     db: Db;
     sqlite: Database.Database;
     config: AppConfig;
-    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    authenticate: (
+      request: FastifyRequest,
+      reply: FastifyReply,
+    ) => Promise<void>;
   }
 }

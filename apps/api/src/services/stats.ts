@@ -5,11 +5,7 @@ import { accountSummaries, trialBalance, type AccountSummary } from "./ledger";
 import { jobStatusCounts } from "./jobs";
 import { serializePayment, type PaymentView } from "./serializers";
 
-const SUCCESSFUL = [
-  "succeeded",
-  "partially_refunded",
-  "refunded",
-] as const;
+const SUCCESSFUL = ["succeeded", "partially_refunded", "refunded"] as const;
 
 export interface Overview {
   merchant: { id: string; name: string };
@@ -154,10 +150,12 @@ export interface TimeseriesPoint {
   volume_minor: number;
 }
 
-export function timeseries(db: Db, merchantId: string, days: number): TimeseriesPoint[] {
-  const start = new Date(
-    Date.now() - (days - 1) * 24 * 60 * 60 * 1000,
-  );
+export function timeseries(
+  db: Db,
+  merchantId: string,
+  days: number,
+): TimeseriesPoint[] {
+  const start = new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000);
   const startIso = new Date(
     Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()),
   ).toISOString();
@@ -172,7 +170,10 @@ export function timeseries(db: Db, merchantId: string, days: number): Timeseries
     })
     .from(payments)
     .where(
-      and(eq(payments.merchantId, merchantId), gte(payments.createdAt, startIso)),
+      and(
+        eq(payments.merchantId, merchantId),
+        gte(payments.createdAt, startIso),
+      ),
     )
     .groupBy(sql`substr(${payments.createdAt}, 1, 10)`)
     .orderBy(sql`substr(${payments.createdAt}, 1, 10)`)
