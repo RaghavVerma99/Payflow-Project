@@ -1,0 +1,29 @@
+{
+  "name": "payflow",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PayFlow — a payment processing simulator with a Fastify API and a React operations console",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev -w @payflow/api",
+    "dev:web": "npm run dev -w @payflow/web",
+    "build": "npm run build -w @payflow/web && npm run build -w @payflow/api",
+    "start": "npm run start -w @payflow/api",
+    "seed": "npm run seed -w @payflow/api",
+    "test": "npm run test -w @payflow/api",
+    "typecheck": "npm run typecheck -w @payflow/api && npm run typecheck -w @payflow/web",
+    "format": "prettier --write \"**/*.{ts,tsx,css,md,json}\"",
+    "clean": "rm -rf apps/api/dist apps/web/dist data"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2"
+  }
+}
