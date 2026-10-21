@@ -921,7 +921,40 @@ Each lab takes two minutes and produces an observation you can defend.
 
 ---
 
-# Part VIII — Glossary and reading
+# Part VIII — Storage, glossary and reading
+
+## 8.1 Storage schema
+
+| Table                 | Purpose                    | Principal constraints                               |
+| --------------------- | -------------------------- | --------------------------------------------------- |
+| `merchants`           | Tenant boundary            | `status` limited to `active` or `disabled`          |
+| `api_keys`            | Hashed credentials         | Unique `key_prefix`                                 |
+| `payments`            | Payment state              | `amount_minor > 0`; refunded plus reserved ≤ amount |
+| `payment_attempts`    | One row per processor call | Unique `(payment_id, attempt_number)`               |
+| `payment_events`      | Append-only transition log | Indexed by payment and time                         |
+| `jobs`                | Durable work queue         | Status, attempts, lease, next run time              |
+| `idempotency_records` | Replay cache               | Unique `(merchant_id, operation, idempotency_key)`  |
+| `accounts`            | Ledger accounts            | Unique `(merchant_id, code)`                        |
+| `ledger_transactions` | Journal headers            | Unique `(source_type, source_id)`                   |
+| `ledger_entries`      | Journal lines              | Positive amounts; immutable                         |
+| `refunds`             | Refund state               | `amount_minor > 0`; references payment and merchant |
+
+```text
+merchants 1 ──< api_keys
+merchants 1 ──< payments 1 ──< payment_attempts
+                         ├──< payment_events
+                         └──< refunds
+merchants 1 ──< accounts 1 ──< ledger_entries >── 1 ledger_transactions
+merchants 1 ──< idempotency_records
+payments/refunds ── job.aggregate_id (logical, not a foreign key)
+```
+
+SQLite is configured on start-up with `journal_mode = WAL`,
+`foreign_keys = ON`, `busy_timeout = 30000`, and `synchronous = NORMAL`. The
+schema is applied idempotently; no migration framework is present, so schema
+changes require the database to be rebuilt.
+
+## 8.2 Glossary
 
 | Term                    | Meaning here                                                                       |
 | ----------------------- | ---------------------------------------------------------------------------------- |
@@ -943,6 +976,8 @@ Each lab takes two minutes and produces an observation you can defend.
 | **Scenario**            | Forced simulator outcome for a request                                             |
 | **Replay**              | Returning a stored response instead of re-running the work                         |
 | **At-least-once**       | The delivery guarantee; paired with idempotent handlers                            |
+
+## 8.3 Reading list
 
 | Topic          | Resource                                                                                         |
 | -------------- | ------------------------------------------------------------------------------------------------ |
