@@ -23,9 +23,15 @@ const queryClient = new QueryClient({
 
 function Splash() {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-5 bg-background">
+    <div className="relative flex min-h-dvh flex-col items-center justify-center gap-5 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-grid opacity-40 [mask-image:radial-gradient(circle_at_center,black,transparent_70%)]" />
       <Logo />
-      <Spinner className="size-4 text-muted-foreground" />
+      <div className="flex items-center gap-3">
+        <Spinner className="size-4 text-primary" />
+        <span className="display-soft text-[13px] italic text-muted-foreground">
+          Opening the atelier…
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, lt, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { jobs, type JobRow } from "../schema";
-import { addSeconds, newId, nowIso } from "../domain";
+import { addSeconds, backoffSeconds, newId, nowIso } from "../domain";
 
 export type JobKind =
   | "process_payment"
@@ -161,14 +161,14 @@ export function failJob(
     return "dead";
   }
 
-  const backoffSeconds = Math.min(300, 2 ** job.attempts * 2);
+  const backoff = backoffSeconds(job.attempts);
   db.update(jobs)
     .set({
       status: "retrying",
       claimedBy: null,
       leaseExpiresAt: null,
       lastError: message,
-      nextRunAt: addSeconds(now, backoffSeconds),
+      nextRunAt: addSeconds(now, backoff),
       updatedAt: now,
     })
     .where(eq(jobs.id, jobId))

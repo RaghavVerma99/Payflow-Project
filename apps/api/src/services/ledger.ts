@@ -5,7 +5,6 @@ import {
   ledgerEntries,
   ledgerTransactions,
   type AccountRow,
-  type LedgerEntryRow,
 } from "../schema";
 import { errors, newId, nowIso } from "../domain";
 
@@ -429,5 +428,3 @@ export function listJournals(
         : null,
   };
 }
-
-export type LedgerEntry = LedgerEntryRow;

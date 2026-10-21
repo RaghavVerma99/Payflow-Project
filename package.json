@@ -19,7 +19,9 @@
     "seed": "npm run seed -w @payflow/api",
     "test": "npm run test -w @payflow/api",
     "typecheck": "npm run typecheck -w @payflow/api && npm run typecheck -w @payflow/web",
+    "verify": "npm run typecheck && npm test && npm run build",
     "format": "prettier --write \"**/*.{ts,tsx,css,md,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,css,md,json}\"",
     "clean": "rm -rf apps/api/dist apps/web/dist data"
   },
   "devDependencies": {

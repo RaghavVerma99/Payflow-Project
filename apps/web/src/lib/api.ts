@@ -169,11 +169,6 @@ export interface DemoSession {
   environment: string;
 }
 
-export interface Meta {
-  requestId?: string;
-  replayed?: boolean;
-}
-
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
 let apiKey: string | null = null;
@@ -334,6 +329,8 @@ export const api = {
         ? { "Idempotency-Key": idempotencyKey }
         : undefined,
     }),
+  cancelRefund: (id: string) =>
+    request<Refund>(`/v1/refunds/${id}/cancel`, { method: "POST" }),
 
   accounts: () => request<AccountsResponse>("/v1/accounts"),
   journals: (params: { limit?: number; cursor?: string | null }) =>

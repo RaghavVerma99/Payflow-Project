@@ -10,7 +10,6 @@ export default defineConfig({
       "/v1": "http://localhost:4000",
       "/health": "http://localhost:4000",
       "/docs": "http://localhost:4000",
-      "/openapi.json": "http://localhost:4000",
     },
   },
   build: {

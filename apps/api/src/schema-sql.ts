@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS refunds (
   amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
   currency TEXT NOT NULL DEFAULT 'INR',
   status TEXT NOT NULL DEFAULT 'reserved'
-    CHECK (status IN ('reserved','processing','succeeded','failed','canceled')),
+    CHECK (status IN ('reserved','processing','succeeded','failed','canceled','unknown')),
   reason TEXT,
   failure_code TEXT,
   processor_reference TEXT,

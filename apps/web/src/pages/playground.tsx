@@ -5,10 +5,12 @@ import {
   Copy,
   RefreshCw,
   Send,
+  Sparkles,
   Terminal,
 } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "../components/layout";
+import { Reveal } from "../components/motion";
 import {
   Badge,
   Button,
@@ -104,13 +106,13 @@ function highlightJson(value: unknown): string {
   return json.replace(
     /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)/g,
     (match) => {
-      let className = "text-amber-400";
+      let className = "text-[#e8b878]";
       if (match.startsWith('"')) {
-        className = match.endsWith(":") ? "text-sky-400" : "text-emerald-400";
+        className = match.endsWith(":") ? "text-[#f2b544]" : "text-[#8fd3b6]";
       } else if (/true|false/.test(match)) {
-        className = "text-violet-400";
+        className = "text-[#c6b5f7]";
       } else if (/null/.test(match)) {
-        className = "text-zinc-500";
+        className = "text-[#8f8577]";
       }
       return `<span class="${className}">${match}</span>`;
     },
@@ -118,8 +120,8 @@ function highlightJson(value: unknown): string {
 }
 
 const METHOD_TONES: Record<string, string> = {
-  GET: "border-sky-500/25 bg-sky-500/10 text-sky-600 dark:text-sky-400",
-  POST: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  GET: "border-sky-500/25 bg-sky-500/10 text-sky-600 dark:text-sky-300",
+  POST: "border-primary/30 bg-primary/10 text-primary",
 };
 
 export function PlaygroundPage() {
@@ -204,9 +206,9 @@ export function PlaygroundPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Developer tools"
+        eyebrow="Chapter 05 · The workshop"
         title="API Playground"
-        description="Send real requests to this API with the current merchant key. Non-2xx responses are shown, not thrown."
+        description="Send real requests with this merchant's key. Non-2xx responses are shown, not thrown — a place to learn by handling the edges."
         actions={
           <Button variant="outline" size="sm" asChild>
             <a href="/docs" target="_blank" rel="noreferrer">
@@ -216,41 +218,62 @@ export function PlaygroundPage() {
         }
       />
 
-      <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {PRESETS.map((preset) => (
+      <div className="mb-2 flex items-center gap-2.5">
+        <Sparkles className="size-3.5 text-primary" />
+        <span className="label-craft">The recipes</span>
+        <span className="h-px flex-1 bg-border" />
+        <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-muted-foreground/60">
+          Tap to load
+        </span>
+      </div>
+
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {PRESETS.map((preset, index) => (
           <button
             key={preset.id}
             type="button"
             onClick={() => applyPreset(preset)}
             className={cn(
-              "rounded-lg border p-3 text-left transition-colors",
+              "pressable group relative overflow-hidden rounded-xl border p-3.5 text-left",
               presetId === preset.id
-                ? "border-emerald-500/40 bg-emerald-500/[0.06]"
-                : "border-border bg-card hover:bg-muted/40",
+                ? "border-primary/40 bg-primary/[0.055] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                : "border-border bg-card/55 hover:border-primary/25 hover:bg-card",
             )}
           >
+            <span
+              className={cn(
+                "absolute left-0 top-1/2 h-6 w-[2px] -translate-y-1/2 rounded-full bg-primary transition-opacity",
+                presetId === preset.id ? "opacity-100" : "opacity-0",
+              )}
+            />
             <div className="flex items-center gap-2">
+              <span className="font-mono text-[8px] text-muted-foreground/40">
+                {String(index + 1).padStart(2, "0")}
+              </span>
               <span
                 className={cn(
-                  "rounded border px-1.5 py-0.5 font-mono text-[9px] font-semibold",
+                  "rounded-full border px-2 py-0.5 font-mono text-[8px] font-semibold tracking-[0.08em]",
                   METHOD_TONES[preset.method],
                 )}
               >
                 {preset.method}
               </span>
-              <span className="text-xs font-medium">{preset.label}</span>
+              <span className="text-[12px] font-medium">{preset.label}</span>
             </div>
-            <p className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground">
+            <p className="mt-2 truncate font-mono text-[10px] text-muted-foreground/80">
               {preset.path}
             </p>
           </button>
         ))}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <Reveal className="grid gap-3 lg:grid-cols-2">
         <Card className="flex flex-col">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Request</CardTitle>
+          <CardHeader className="flex-row items-start justify-between space-y-0">
+            <div>
+              <span className="label-craft">The draft</span>
+              <CardTitle className="mt-1.5">Request</CardTitle>
+            </div>
             <Badge variant="outline" className="font-mono">
               {method}
             </Badge>
@@ -346,8 +369,11 @@ export function PlaygroundPage() {
         </Card>
 
         <Card className="flex flex-col">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Response</CardTitle>
+          <CardHeader className="flex-row items-start justify-between space-y-0">
+            <div>
+              <span className="label-craft">The proof</span>
+              <CardTitle className="mt-1.5">Response</CardTitle>
+            </div>
             {response ? (
               <div className="flex items-center gap-2">
                 <Badge
@@ -385,9 +411,9 @@ export function PlaygroundPage() {
                   />
                 </div>
 
-                <div className="max-h-[430px] overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                <div className="code-surface max-h-[430px] overflow-auto rounded-xl p-4">
                   <pre
-                    className="font-mono text-[11px] leading-relaxed text-zinc-100"
+                    className="font-mono text-[11px] leading-relaxed text-[#efe6d5]"
                     dangerouslySetInnerHTML={{
                       __html: highlightJson(response.body),
                     }}
@@ -414,27 +440,31 @@ export function PlaygroundPage() {
                 </details>
               </>
             ) : (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border px-6 py-16 text-center">
-                <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/80 bg-gradient-to-b from-transparent to-muted/20 px-6 py-16 text-center">
+                <div className="relative flex size-12 items-center justify-center rounded-full border border-border bg-background/40 text-muted-foreground">
+                  <span className="absolute inset-[-5px] rounded-full border border-primary/15" />
                   <Terminal className="size-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">No response yet</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Pick a preset, edit the request, and send it.
+                  <p className="display-soft text-lg">Awaiting a request</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Pick a recipe, edit the draft, and send it.
                   </p>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
-      </div>
+      </Reveal>
 
       <Card className="mt-3">
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-2">
-            <Braces className="size-4 text-muted-foreground" />
-            <CardTitle>Equivalent cURL</CardTitle>
+        <CardHeader className="flex-row items-start justify-between space-y-0">
+          <div>
+            <span className="label-craft">For the terminal</span>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Braces className="size-4 text-primary" />
+              <CardTitle>Equivalent cURL</CardTitle>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -450,7 +480,7 @@ export function PlaygroundPage() {
           </div>
         </CardHeader>
         <CardContent className="pt-3">
-          <pre className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-300">
+          <pre className="code-surface overflow-x-auto rounded-xl p-4 font-mono text-[11px] leading-relaxed text-[#d9cfbf]">
             {curl}
           </pre>
           <p className="mt-2 text-[10px] text-muted-foreground">

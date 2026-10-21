@@ -46,7 +46,11 @@ interface DemoStats {
   refunds: number;
 }
 
-function seedDemo(db: Db, merchantId: string): DemoStats {
+function seedDemo(
+  db: Db,
+  merchantId: string,
+  maxJobAttempts: number,
+): DemoStats {
   const existing = db
     .select({ id: payments.id })
     .from(payments)
@@ -242,6 +246,7 @@ function seedDemo(db: Db, merchantId: string): DemoStats {
           kind: "process_payment",
           aggregateId: id,
           payload: { payment_id: id, scenario },
+          maxAttempts: maxJobAttempts,
         });
         paymentCount += 1;
       }
@@ -328,7 +333,7 @@ function main(): void {
       });
     }
 
-    const demo = seedDemo(db, acmeId);
+    const demo = seedDemo(db, acmeId, config.maxJobAttempts);
 
     for (const credential of credentials) {
       credential.seeded = credential.merchant_id === acmeId;

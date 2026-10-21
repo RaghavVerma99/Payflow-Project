@@ -62,7 +62,10 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ["Ledger"],
         summary: "List posted journals",
-        querystring: ListJournalsQuery,
+        querystring: ListJournalsQuery(
+          app.config.defaultPageSize,
+          app.config.maxPageSize,
+        ),
         response: { 200: JournalListSchema },
       },
     },

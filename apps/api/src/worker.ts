@@ -216,6 +216,7 @@ function processPayment(
             processor_reference: reconciliationReference,
           },
           runAt: addSeconds(nowIso(), 5),
+          maxAttempts: ctx.config.maxJobAttempts,
         });
       }
     },
@@ -377,6 +378,7 @@ function processRefund(
         processor_reference: prepared.reference,
       },
       runAt: addSeconds(nowIso(), 5),
+      maxAttempts: ctx.config.maxJobAttempts,
     });
   }
 }
@@ -575,10 +577,6 @@ export function startWorker(
       if (timer) clearTimeout(timer);
     },
   };
-}
-
-export function nextRetryAt(attempts: number): string {
-  return addSeconds(nowIso(), Math.min(300, 2 ** attempts * 2));
 }
 
 export function jobQueueDepth(db: Db): number {

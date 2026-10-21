@@ -16,7 +16,7 @@ import {
   getPaymentDetail,
   listPayments,
 } from "../services/payments";
-import { listRefundsForPayment } from "../services/refunds";
+import { listRefunds } from "../services/refunds";
 import { serializePayment } from "../services/serializers";
 
 export function idempotencyKeyFrom(
@@ -83,6 +83,7 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
         scenario,
         idempotencyKey: idempotencyKeyFrom(request.headers),
         idempotencyTtlHours: app.config.idempotencyTtlHours,
+        maxJobAttempts: app.config.maxJobAttempts,
       });
 
       if (replayed) reply.header("Idempotency-Replayed", "true");
@@ -98,7 +99,10 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ["Payments"],
         summary: "List payments",
-        querystring: ListPaymentsQuery,
+        querystring: ListPaymentsQuery(
+          app.config.defaultPageSize,
+          app.config.maxPageSize,
+        ),
         response: { 200: PaymentListSchema },
       },
     },
@@ -157,17 +161,21 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Refunds"],
         summary: "List refunds for a payment",
         params: PaymentParams,
-        querystring: ListRefundsQuery,
+        querystring: ListRefundsQuery(
+          app.config.defaultPageSize,
+          app.config.maxPageSize,
+        ),
         response: { 200: RefundListSchema },
       },
     },
     async (request) => {
-      const data = listRefundsForPayment(
-        app.db,
-        request.merchant.id,
-        request.params.id,
-      );
-      return { data, has_more: false, next_cursor: null };
+      return listRefunds(app.db, {
+        merchantId: request.merchant.id,
+        paymentId: request.params.id,
+        limit: request.query.limit,
+        cursor: request.query.cursor ?? null,
+        status: request.query.status ?? null,
+      });
     },
   );
 };

@@ -27,7 +27,7 @@ import {
   Tabs,
 } from "../components/ui";
 import { api } from "../lib/api";
-import { cn, relativeTime } from "../lib/utils";
+import { cn, formatCurrency, relativeTime } from "../lib/utils";
 
 const FILTERS = [
   { value: "all", label: "All" },
@@ -73,12 +73,17 @@ export function PaymentsPage() {
     );
   }, [payments, search]);
 
+  const loadedVolume = useMemo(
+    () => visible.reduce((sum, payment) => sum + payment.amount_minor, 0),
+    [visible],
+  );
+
   return (
     <div>
       <PageHeader
-        eyebrow="Payments"
+        eyebrow="Chapter 02 · The charges"
         title="Payments"
-        description="Create charges, follow processor attempts and drill into the immutable event timeline."
+        description="Every charge begins as an intention, becomes a processor attempt, and settles into the book. Follow each one here."
         actions={
           <>
             <Button
@@ -102,39 +107,46 @@ export function PaymentsPage() {
         }
       />
 
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <Tabs
           value={status}
           onChange={(value) => setStatus(value)}
           items={FILTERS}
         />
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search loaded payments"
-            className="h-8 pl-9 text-xs"
-          />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-64">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/60" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search the loaded lines"
+              className="h-9 rounded-full pl-9 text-[11px]"
+            />
+          </div>
+          <div className="hidden items-center gap-2 rounded-full border border-border/70 bg-background/25 px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground xl:flex">
+            <span>{visible.length} lines</span>
+            <span className="h-2.5 w-px bg-border" />
+            <span>{formatCurrency(loadedVolume)} in view</span>
+          </div>
         </div>
       </div>
 
-      <Card>
+      <Card className="overflow-hidden">
         {paymentsQuery.isLoading ? (
           <div className="space-y-3 p-5">
             {Array.from({ length: 6 }, (_, index) => (
-              <Skeleton key={index} className="h-10 w-full" />
+              <Skeleton key={index} className="h-12 w-full" />
             ))}
           </div>
         ) : visible.length === 0 ? (
           <EmptyState
-            className="border-0"
+            className="m-4 border-0"
             icon={<CreditCard className="size-4" />}
-            title={search ? "No matching payments" : "No payments yet"}
+            title={search ? "No matching lines" : "The first blank page"}
             description={
               search
                 ? "Try a different search term or clear the filter."
-                : "Create a payment to watch the worker process it."
+                : "Compose a payment and watch the worker carry it through."
             }
             action={
               search ? (
@@ -148,21 +160,21 @@ export function PaymentsPage() {
               ) : (
                 <Button size="sm" onClick={() => setNewOpen(true)}>
                   <Plus className="size-4" />
-                  New payment
+                  Compose a payment
                 </Button>
               )
             }
           />
         ) : (
           <Table>
-            <TableHeader>
-              <TableRow>
+            <TableHeader className="bg-muted/20">
+              <TableRow className="hover:bg-transparent">
                 <TableHead>Payment</TableHead>
                 <TableHead className="hidden sm:table-cell">Customer</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="hidden sm:table-cell">Status</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="hidden text-right md:table-cell">
-                  Refunded
+                  Returned
                 </TableHead>
                 <TableHead className="hidden text-right sm:table-cell">
                   Created
@@ -171,33 +183,43 @@ export function PaymentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visible.map((payment) => (
+              {visible.map((payment, index) => (
                 <TableRow
                   key={payment.id}
-                  className="cursor-pointer"
+                  className="group cursor-pointer"
                   onClick={() => setDetailId(payment.id)}
                 >
                   <TableCell>
-                    <p className="max-w-[220px] truncate text-xs font-medium">
-                      {payment.description ?? "Payment"}
-                    </p>
-                    <IdText id={payment.id} />
+                    <div className="flex items-start gap-3">
+                      <span className="row-index mt-0.5 w-5 shrink-0 font-mono text-[9px] text-muted-foreground/30">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="max-w-[220px] truncate text-[12px] font-medium">
+                          {payment.description ?? "Unnamed payment"}
+                        </p>
+                        <IdText id={payment.id} />
+                        <div className="mt-1.5 sm:hidden">
+                          <StatusBadge status={payment.status} />
+                        </div>
+                      </div>
+                    </div>
                   </TableCell>
-                  <TableCell className="hidden font-mono text-[11px] text-muted-foreground sm:table-cell">
+                  <TableCell className="hidden font-mono text-[10px] text-muted-foreground sm:table-cell">
                     {payment.customer_id ?? "—"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <div className="flex flex-col items-start gap-1">
                       <StatusBadge status={payment.status} />
                       {payment.failure_code ? (
-                        <Badge variant="danger" className="font-mono">
-                          {payment.failure_code}
-                        </Badge>
+                        <Badge variant="danger">{payment.failure_code}</Badge>
                       ) : null}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Amount minor={payment.amount_minor} />
+                    <span className="display whitespace-nowrap text-[16px] leading-none">
+                      {formatCurrency(payment.amount_minor)}
+                    </span>
                   </TableCell>
                   <TableCell className="hidden text-right md:table-cell">
                     <Amount
@@ -205,11 +227,13 @@ export function PaymentsPage() {
                       muted={payment.refunded_minor === 0}
                     />
                   </TableCell>
-                  <TableCell className="hidden text-right text-xs text-muted-foreground sm:table-cell">
-                    {relativeTime(payment.created_at)}
+                  <TableCell className="hidden text-right sm:table-cell">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground/70">
+                      {relativeTime(payment.created_at)}
+                    </span>
                   </TableCell>
-                  <TableCell>
-                    <ChevronRight className="size-4 text-muted-foreground/50" />
+                  <TableCell className="hidden sm:table-cell">
+                    <ChevronRight className="size-4 text-muted-foreground/30 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                   </TableCell>
                 </TableRow>
               ))}
@@ -218,23 +242,34 @@ export function PaymentsPage() {
         )}
 
         {paymentsQuery.hasNextPage ? (
-          <div className="flex justify-center border-t border-border p-3">
+          <div className="flex justify-center border-t border-border/70 p-4">
             <Button
               variant="outline"
               size="sm"
               disabled={paymentsQuery.isFetchingNextPage}
               onClick={() => void paymentsQuery.fetchNextPage()}
             >
-              {paymentsQuery.isFetchingNextPage ? "Loading…" : "Load more"}
+              {paymentsQuery.isFetchingNextPage
+                ? "Turning the page…"
+                : "Load more"}
             </Button>
           </div>
         ) : null}
       </Card>
 
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        Showing {visible.length} loaded payment{visible.length === 1 ? "" : "s"}
-        . Rows refresh every 5 seconds.
-      </p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground/60">
+        <p>
+          Showing {visible.length} loaded payment
+          {visible.length === 1 ? "" : "s"} · sorted by newest
+        </p>
+        <p className="inline-flex items-center gap-1.5">
+          <span className="relative flex size-1.5">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+            <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+          </span>
+          live · 5s refresh
+        </p>
+      </div>
 
       <NewPaymentDialog
         open={newOpen}

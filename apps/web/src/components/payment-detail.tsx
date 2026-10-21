@@ -57,13 +57,11 @@ function Meta({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
+    <div className="rounded-xl border border-border/70 bg-background/25 px-3 py-2.5">
+      <p className="label-craft">{label}</p>
       <p
         className={cn(
-          "mt-0.5 truncate text-xs font-medium",
+          "mt-1 truncate text-[12px] font-medium",
           mono && "font-mono",
         )}
       >
@@ -126,7 +124,9 @@ export function PaymentDetailDialog({
   const [refundAmount, setRefundAmount] = useState("");
   const [refundReason, setRefundReason] = useState("");
   const [refundScenario, setRefundScenario] = useState<Scenario>("approve");
-  const [pending, setPending] = useState<"cancel" | "refund" | null>(null);
+  const [pending, setPending] = useState<
+    "cancel" | "refund" | "refund-cancel" | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   const detailQuery = useQuery({
@@ -192,6 +192,20 @@ export function PaymentDetailDialog({
     setRefundOpen(true);
   };
 
+  const cancelRefund = async (refundId: string) => {
+    setPending("refund-cancel");
+    setError(null);
+    try {
+      await api.cancelRefund(refundId);
+      toast.success("Refund canceled, capacity released");
+      await invalidate();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Cancel failed.");
+    } finally {
+      setPending(null);
+    }
+  };
+
   const submitRefund = async (event: FormEvent) => {
     event.preventDefault();
     if (!payment) return;
@@ -248,7 +262,7 @@ export function PaymentDetailDialog({
             ) : null}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <DialogTitle className="tabular text-2xl">
+            <DialogTitle className="tabular text-[30px] leading-none">
               {payment ? formatCurrency(payment.amount_minor) : "Loading…"}
             </DialogTitle>
             {payment ? <StatusBadge status={payment.status} /> : null}
@@ -375,7 +389,7 @@ export function PaymentDetailDialog({
               >
                 <div className="mb-3 flex items-center gap-2">
                   <RotateCcw className="size-4 text-violet-500" />
-                  <p className="text-xs font-semibold">Refund payment</p>
+                  <p className="display-soft text-[17px]">Refund payment</p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -451,8 +465,8 @@ export function PaymentDetailDialog({
             <div className="grid gap-6 sm:grid-cols-2">
               <section>
                 <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-xs font-semibold">Timeline</h4>
-                  <span className="text-[10px] text-muted-foreground">
+                  <h4 className="display-soft text-[17px]">Timeline</h4>
+                  <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground/60">
                     {payment.events.length} events
                   </span>
                 </div>
@@ -462,10 +476,10 @@ export function PaymentDetailDialog({
               <section className="space-y-5">
                 <div>
                   <div className="mb-3 flex items-center justify-between">
-                    <h4 className="text-xs font-semibold">
+                    <h4 className="display-soft text-[17px]">
                       Processor attempts
                     </h4>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground/60">
                       {payment.attempts.length}
                     </span>
                   </div>
@@ -516,8 +530,8 @@ export function PaymentDetailDialog({
 
                 <div>
                   <div className="mb-3 flex items-center justify-between">
-                    <h4 className="text-xs font-semibold">Refunds</h4>
-                    <span className="text-[10px] text-muted-foreground">
+                    <h4 className="display-soft text-[17px]">Refunds</h4>
+                    <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground/60">
                       {refunds.length}
                     </span>
                   </div>
@@ -549,7 +563,25 @@ export function PaymentDetailDialog({
                               {formatTime(refund.created_at)}
                             </p>
                           </div>
-                          <IdText id={refund.id} />
+                          <div className="flex shrink-0 items-center gap-2">
+                            {refund.status === "reserved" ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={pending !== null}
+                                onClick={() => void cancelRefund(refund.id)}
+                                title="Cancel this refund and release its capacity"
+                              >
+                                {pending === "refund-cancel" ? (
+                                  <Spinner />
+                                ) : (
+                                  <Ban className="size-3" />
+                                )}
+                                Cancel
+                              </Button>
+                            ) : null}
+                            <IdText id={refund.id} />
+                          </div>
                         </div>
                       ))}
                     </div>

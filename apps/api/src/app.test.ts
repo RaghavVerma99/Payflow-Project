@@ -135,7 +135,9 @@ describe("payments", () => {
   });
 
   it("approves, settles and posts a balanced journal", async () => {
-    const created = (await createPayment({ simulator_scenario: "approve" })).json();
+    const created = (
+      await createPayment({ simulator_scenario: "approve" })
+    ).json();
     drain();
 
     const detail = (await getPayment(created.id)).json();
@@ -174,7 +176,9 @@ describe("payments", () => {
   });
 
   it("declines without posting a journal", async () => {
-    const created = (await createPayment({ simulator_scenario: "decline" })).json();
+    const created = (
+      await createPayment({ simulator_scenario: "decline" })
+    ).json();
     drain();
 
     const detail = (await getPayment(created.id)).json();
@@ -208,7 +212,9 @@ describe("payments", () => {
   });
 
   it("retries transient errors and records both attempts", async () => {
-    const created = (await createPayment({ simulator_scenario: "transient" })).json();
+    const created = (
+      await createPayment({ simulator_scenario: "transient" })
+    ).json();
     drain();
 
     const pending = (await getPayment(created.id)).json();
@@ -226,14 +232,18 @@ describe("payments", () => {
   });
 
   it("marks a timeout unknown, then reconciles it", async () => {
-    const created = (await createPayment({ simulator_scenario: "timeout" })).json();
+    const created = (
+      await createPayment({ simulator_scenario: "timeout" })
+    ).json();
     drain();
 
     const pending = (await getPayment(created.id)).json();
     expect(pending.status).toBe("unknown");
 
     app.sqlite
-      .prepare("update jobs set next_run_at = ? where kind = 'reconcile_payment'")
+      .prepare(
+        "update jobs set next_run_at = ? where kind = 'reconcile_payment'",
+      )
       .run("2000-01-01T00:00:00.000Z");
     drain();
 
@@ -283,7 +293,9 @@ describe("payments", () => {
 
 describe("refunds", () => {
   it("partially refunds, reserves capacity and posts the reversing entry", async () => {
-    const created = (await createPayment({ simulator_scenario: "approve" })).json();
+    const created = (
+      await createPayment({ simulator_scenario: "approve" })
+    ).json();
     drain();
 
     const refund = await createRefund({
@@ -327,7 +339,9 @@ describe("refunds", () => {
   });
 
   it("rejects refunds above the remaining capacity", async () => {
-    const created = (await createPayment({ simulator_scenario: "approve" })).json();
+    const created = (
+      await createPayment({ simulator_scenario: "approve" })
+    ).json();
     drain();
 
     const response = await createRefund({
@@ -340,7 +354,9 @@ describe("refunds", () => {
   });
 
   it("releases the reservation when the processor declines", async () => {
-    const created = (await createPayment({ simulator_scenario: "approve" })).json();
+    const created = (
+      await createPayment({ simulator_scenario: "approve" })
+    ).json();
     drain();
 
     await createRefund({
@@ -355,6 +371,122 @@ describe("refunds", () => {
     expect(detail.refund_reserved_minor).toBe(0);
     expect(detail.refunded_minor).toBe(0);
     expect(detail.refundable_minor).toBe(24_900);
+  });
+
+  it("marks a timed-out refund unknown, then reconciles it", async () => {
+    const created = (
+      await createPayment({ simulator_scenario: "approve" })
+    ).json();
+    drain();
+
+    const refund = await createRefund({
+      payment_id: created.id,
+      amount_minor: 5_000,
+      simulator_scenario: "timeout",
+    });
+    expect(refund.statusCode).toBe(202);
+    drain();
+
+    const pending = (
+      await app.inject({
+        method: "GET",
+        url: `/v1/refunds/${refund.json().id}`,
+        headers: auth(),
+      })
+    ).json();
+    expect(pending.status).toBe("unknown");
+
+    app.sqlite
+      .prepare(
+        "update jobs set next_run_at = ? where kind = 'reconcile_refund'",
+      )
+      .run("2000-01-01T00:00:00.000Z");
+    drain();
+
+    const resolved = (
+      await app.inject({
+        method: "GET",
+        url: `/v1/refunds/${refund.json().id}`,
+        headers: auth(),
+      })
+    ).json();
+    expect(["succeeded", "failed"]).toContain(resolved.status);
+  });
+
+  it("cancels a reserved refund and releases its capacity", async () => {
+    const created = (
+      await createPayment({ simulator_scenario: "approve" })
+    ).json();
+    drain();
+
+    const refund = await createRefund({
+      payment_id: created.id,
+      amount_minor: 5_000,
+      simulator_scenario: "approve",
+    });
+    expect(refund.statusCode).toBe(202);
+
+    const reserved = (await getPayment(created.id)).json();
+    expect(reserved.refund_reserved_minor).toBe(5_000);
+    expect(reserved.refundable_minor).toBe(19_900);
+
+    const canceled = await app.inject({
+      method: "POST",
+      url: `/v1/refunds/${refund.json().id}/cancel`,
+      headers: auth(),
+    });
+    expect(canceled.statusCode).toBe(200);
+    expect(canceled.json().status).toBe("canceled");
+
+    const after = (await getPayment(created.id)).json();
+    expect(after.refund_reserved_minor).toBe(0);
+    expect(after.refunded_minor).toBe(0);
+    expect(after.refundable_minor).toBe(24_900);
+    expect(after.status).toBe("succeeded");
+    expect(after.events.at(-1).type).toBe("refund.canceled");
+
+    expect(drain()).toBe(0);
+
+    const again = await app.inject({
+      method: "POST",
+      url: `/v1/refunds/${refund.json().id}/cancel`,
+      headers: auth(),
+    });
+    expect(again.statusCode).toBe(409);
+    expect(again.json().error.code).toBe("refund_not_cancelable");
+  });
+
+  it("paginates the refunds of a single payment", async () => {
+    const created = (
+      await createPayment({ simulator_scenario: "approve" })
+    ).json();
+    drain();
+
+    for (const key of ["refund-page-1", "refund-page-2"]) {
+      await app.inject({
+        method: "POST",
+        url: "/v1/refunds",
+        headers: { ...auth(), "idempotency-key": key },
+        payload: {
+          payment_id: created.id,
+          amount_minor: 5_000,
+          simulator_scenario: "approve",
+        },
+      });
+    }
+    drain();
+
+    const page = (
+      await app.inject({
+        method: "GET",
+        url: `/v1/payments/${created.id}/refunds?limit=1`,
+        headers: auth(),
+      })
+    ).json();
+
+    expect(page.data).toHaveLength(1);
+    expect(page.has_more).toBe(true);
+    expect(page.next_cursor).toBeTruthy();
   });
 });
 
@@ -385,7 +517,9 @@ describe("ledger", () => {
 
 describe("analytics", () => {
   it("aggregates volume, refunds and ledger health", async () => {
-    const created = (await createPayment({ simulator_scenario: "approve" })).json();
+    const created = (
+      await createPayment({ simulator_scenario: "approve" })
+    ).json();
     drain();
     await createRefund({
       payment_id: created.id,
@@ -429,5 +563,89 @@ describe("analytics", () => {
       status: "ok",
       checks: { database: "ok", worker: "disabled" },
     });
+  });
+});
+
+describe("configuration", () => {
+  async function customApp(
+    overrides: Record<string, unknown>,
+  ): Promise<{ instance: FastifyInstance; headers: Record<string, string> }> {
+    const instance = createApp({
+      dbPath: ":memory:",
+      config: {
+        env: "test",
+        workerEnabled: false,
+        allowSimulatorControls: true,
+        apiKeyPepper: PEPPER,
+        rateLimitMax: 100_000,
+        logLevel: "silent",
+        ...overrides,
+      },
+    });
+    const merchant = createMerchant(instance.db, "Custom Merchant", PEPPER);
+    await instance.ready();
+    return {
+      instance,
+      headers: { authorization: `Bearer ${merchant.rawKey}` },
+    };
+  }
+
+  it("applies the configured page size", async () => {
+    const { instance, headers } = await customApp({
+      defaultPageSize: 1,
+      maxPageSize: 2,
+    });
+
+    for (const amount of [100, 200]) {
+      await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers,
+        payload: { amount_minor: amount },
+      });
+    }
+
+    const page = (
+      await instance.inject({
+        method: "GET",
+        url: "/v1/payments",
+        headers,
+      })
+    ).json();
+    expect(page.data).toHaveLength(1);
+    expect(page.has_more).toBe(true);
+
+    const tooLarge = await instance.inject({
+      method: "GET",
+      url: "/v1/payments?limit=3",
+      headers,
+    });
+    expect(tooLarge.statusCode).toBe(400);
+    expect(tooLarge.json().error.code).toBe("validation_error");
+
+    await instance.close();
+  });
+
+  it("expires idempotency keys once the ttl passes", async () => {
+    const { instance, headers } = await customApp({
+      idempotencyTtlHours: 0,
+    });
+
+    const request = {
+      method: "POST",
+      url: "/v1/payments",
+      headers: { ...headers, "idempotency-key": "ttl-1" },
+      payload: { amount_minor: 100 },
+    };
+
+    const first = await instance.inject(request);
+    expect(first.statusCode).toBe(202);
+
+    const second = await instance.inject(request);
+    expect(second.statusCode).toBe(202);
+    expect(second.headers["idempotency-replayed"]).toBeUndefined();
+    expect(second.json().id).not.toBe(first.json().id);
+
+    await instance.close();
   });
 });

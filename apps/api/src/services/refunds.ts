@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { payments, refunds, type PaymentRow, type RefundRow } from "../schema";
 import {
@@ -11,7 +11,7 @@ import {
   sha256,
   type Page,
 } from "../domain";
-import { enqueue } from "./jobs";
+import { cancelPendingJobs, enqueue } from "./jobs";
 import { withIdempotency } from "./idempotency";
 import { addPaymentEvent, getPayment } from "./payments";
 import { serializeRefund, type RefundView } from "./serializers";
@@ -31,6 +31,7 @@ export interface CreateRefundInput {
   scenario?: string | null;
   idempotencyKey?: string | null;
   idempotencyTtlHours: number;
+  maxJobAttempts?: number;
 }
 
 export function createRefund(
@@ -122,6 +123,7 @@ export function createRefund(
       kind: "process_refund",
       aggregateId: refund.id,
       payload: { refund_id: refund.id, scenario },
+      maxAttempts: input.maxJobAttempts,
     });
 
     return {
@@ -157,6 +159,69 @@ export function getRefund(
 
   if (!refund) throw errors.notFound("Refund");
   return refund;
+}
+
+export function cancelRefund(
+  db: Db,
+  merchantId: string,
+  refundId: string,
+): RefundRow {
+  return db.transaction(
+    (tx) => {
+      const t = tx as unknown as Db;
+      const refund = getRefund(t, merchantId, refundId);
+
+      if (refund.status !== "reserved") {
+        throw errors.refundNotCancelable();
+      }
+
+      const payment = getPayment(t, merchantId, refund.paymentId);
+      const now = nowIso();
+
+      const released = t
+        .update(payments)
+        .set({
+          refundReservedMinor: sql`${payments.refundReservedMinor} - ${refund.amountMinor}`,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(payments.id, payment.id),
+            gte(payments.refundReservedMinor, refund.amountMinor),
+          ),
+        )
+        .run();
+
+      if (released.changes !== 1) {
+        throw new Error(
+          `Refund ${refund.id} could not be released: reservation missing.`,
+        );
+      }
+
+      t.update(refunds)
+        .set({ status: "canceled", updatedAt: now })
+        .where(eq(refunds.id, refund.id))
+        .run();
+
+      cancelPendingJobs(t, refund.id);
+
+      addPaymentEvent(
+        t,
+        payment.id,
+        "refund.canceled",
+        payment.status,
+        payment.status,
+        `Refund ${refund.id} canceled; reservation released.`,
+      );
+
+      return t
+        .select()
+        .from(refunds)
+        .where(eq(refunds.id, refund.id))
+        .get() as RefundRow;
+    },
+    { behavior: "immediate" },
+  );
 }
 
 export interface ListRefundsOptions {
@@ -207,20 +272,4 @@ export function listRefunds(
     has_more: hasMore,
     next_cursor: hasMore && last ? encodeCursor(last) : null,
   };
-}
-
-export function listRefundsForPayment(
-  db: Db,
-  merchantId: string,
-  paymentId: string,
-): RefundView[] {
-  return db
-    .select()
-    .from(refunds)
-    .where(
-      and(eq(refunds.merchantId, merchantId), eq(refunds.paymentId, paymentId)),
-    )
-    .orderBy(desc(refunds.createdAt))
-    .all()
-    .map(serializeRefund);
 }

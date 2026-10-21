@@ -126,13 +126,11 @@ export const refunds = sqliteTable("refunds", {
   updatedAt: text("updated_at").notNull(),
 });
 
-export type MerchantRow = typeof merchants.$inferSelect;
 export type PaymentRow = typeof payments.$inferSelect;
 export type PaymentAttemptRow = typeof paymentAttempts.$inferSelect;
 export type PaymentEventRow = typeof paymentEvents.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
-export type LedgerTransactionRow = typeof ledgerTransactions.$inferSelect;
 export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
 export type RefundRow = typeof refunds.$inferSelect;
 export type IdempotencyRow = typeof idempotencyRecords.$inferSelect;

@@ -106,7 +106,7 @@ export function Amount({
   return (
     <span
       className={cn(
-        "tabular font-medium",
+        "tabular whitespace-nowrap font-medium tracking-[-0.01em]",
         muted && "text-muted-foreground",
         className,
       )}
@@ -119,7 +119,10 @@ export function Amount({
 export function IdText({ id, className }: { id: string; className?: string }) {
   return (
     <span
-      className={cn("font-mono text-xs text-muted-foreground", className)}
+      className={cn(
+        "font-mono text-[10px] tracking-[0.01em] text-muted-foreground",
+        className,
+      )}
       title={id}
     >
       {shortId(id)}

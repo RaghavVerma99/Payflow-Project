@@ -56,10 +56,15 @@ function isUniqueViolation(err: unknown): boolean {
   );
 }
 
+function isExpired(record: IdempotencyRow, now: string): boolean {
+  return Date.parse(record.expiresAt) <= Date.parse(now);
+}
+
 export function withIdempotency<T>(
   db: Db,
   input: IdempotencyInput | null,
   work: (tx: Db) => WorkResult<T>,
+  attempt = 0,
 ): IdempotentResult<T> {
   if (!input) {
     const result = db.transaction((tx) => work(tx as unknown as Db), {
@@ -72,8 +77,10 @@ export function withIdempotency<T>(
     return db.transaction(
       (tx) => {
         const t = tx as unknown as Db;
+        const createdAt = nowIso();
         const existing = findRecord(t, input);
-        if (existing) {
+
+        if (existing && !isExpired(existing, createdAt)) {
           if (existing.requestHash !== input.requestHash) {
             throw errors.idempotencyMismatch();
           }
@@ -83,20 +90,35 @@ export function withIdempotency<T>(
           return replay(existing);
         }
 
-        const createdAt = nowIso();
-        const recordId = newId("idem");
-        t.insert(idempotencyRecords)
-          .values({
-            id: recordId,
-            merchantId: input.merchantId,
-            operation: input.operation,
-            idempotencyKey: input.key,
-            requestHash: input.requestHash,
-            status: "in_progress",
-            createdAt,
-            expiresAt: addHours(createdAt, input.ttlHours),
-          })
-          .run();
+        const recordId = existing?.id ?? newId("idem");
+
+        if (existing) {
+          t.update(idempotencyRecords)
+            .set({
+              requestHash: input.requestHash,
+              status: "in_progress",
+              resourceId: null,
+              responseStatus: null,
+              responseBody: null,
+              createdAt,
+              expiresAt: addHours(createdAt, input.ttlHours),
+            })
+            .where(eq(idempotencyRecords.id, recordId))
+            .run();
+        } else {
+          t.insert(idempotencyRecords)
+            .values({
+              id: recordId,
+              merchantId: input.merchantId,
+              operation: input.operation,
+              idempotencyKey: input.key,
+              requestHash: input.requestHash,
+              status: "in_progress",
+              createdAt,
+              expiresAt: addHours(createdAt, input.ttlHours),
+            })
+            .run();
+        }
 
         const result = work(t);
 
@@ -119,6 +141,14 @@ export function withIdempotency<T>(
 
     const winner = findRecord(db, input);
     if (!winner) throw err;
+
+    if (isExpired(winner, nowIso()) && attempt === 0) {
+      db.delete(idempotencyRecords)
+        .where(eq(idempotencyRecords.id, winner.id))
+        .run();
+      return withIdempotency(db, input, work, attempt + 1);
+    }
+
     if (winner.requestHash !== input.requestHash) {
       throw errors.idempotencyMismatch();
     }

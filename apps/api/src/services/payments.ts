@@ -36,6 +36,7 @@ export interface CreatePaymentInput {
   scenario?: string | null;
   idempotencyKey?: string | null;
   idempotencyTtlHours: number;
+  maxJobAttempts?: number;
 }
 
 export function createPayment(
@@ -96,6 +97,7 @@ export function createPayment(
       kind: "process_payment",
       aggregateId: payment.id,
       payload: { payment_id: payment.id, scenario },
+      maxAttempts: input.maxJobAttempts,
     });
 
     return {

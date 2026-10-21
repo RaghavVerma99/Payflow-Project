@@ -196,23 +196,26 @@ export const CreateRefundBody = z.object({
   simulator_scenario: z.enum(SCENARIOS).optional(),
 });
 
-export const ListPaymentsQuery = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(25),
-  cursor: z.string().optional(),
-  status: z.enum(PAYMENT_STATUSES).optional(),
-});
+export const ListPaymentsQuery = (defaultLimit: number, maxLimit: number) =>
+  z.object({
+    limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
+    cursor: z.string().optional(),
+    status: z.enum(PAYMENT_STATUSES).optional(),
+  });
 
-export const ListRefundsQuery = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(25),
-  cursor: z.string().optional(),
-  status: z.enum(REFUND_STATUSES).optional(),
-  payment_id: z.string().optional(),
-});
+export const ListRefundsQuery = (defaultLimit: number, maxLimit: number) =>
+  z.object({
+    limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
+    cursor: z.string().optional(),
+    status: z.enum(REFUND_STATUSES).optional(),
+    payment_id: z.string().optional(),
+  });
 
-export const ListJournalsQuery = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(25),
-  cursor: z.string().optional(),
-});
+export const ListJournalsQuery = (defaultLimit: number, maxLimit: number) =>
+  z.object({
+    limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
+    cursor: z.string().optional(),
+  });
 
 export const TimeseriesQuery = z.object({
   days: z.coerce.number().int().min(1).max(90).default(14),
@@ -226,6 +229,3 @@ export const DemoSessionSchema = z.object({
   merchant: z.object({ id: z.string(), name: z.string() }),
   environment: z.string(),
 });
-
-export type CreatePaymentBodyType = z.infer<typeof CreatePaymentBody>;
-export type CreateRefundBodyType = z.infer<typeof CreateRefundBody>;

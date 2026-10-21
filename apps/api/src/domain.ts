@@ -24,14 +24,6 @@ export const REFUND_STATUSES = [
 
 export type RefundStatus = (typeof REFUND_STATUSES)[number];
 
-export const TERMINAL_PAYMENT_STATUSES: ReadonlySet<PaymentStatus> = new Set([
-  "succeeded",
-  "failed",
-  "canceled",
-  "refunded",
-  "partially_refunded",
-]);
-
 const ALLOWED_TRANSITIONS: Record<PaymentStatus, readonly PaymentStatus[]> = {
   created: ["processing", "canceled"],
   processing: ["succeeded", "failed", "unknown"],
@@ -88,6 +80,12 @@ export const errors = {
       409,
       "Only succeeded payments can be refunded.",
     ),
+  refundNotCancelable: () =>
+    new AppError(
+      "refund_not_cancelable",
+      409,
+      "Only reserved refunds can be canceled.",
+    ),
   simulatorDisabled: () =>
     new AppError(
       "simulator_controls_disabled",
@@ -110,6 +108,10 @@ export function addSeconds(iso: string, seconds: number): string {
 
 export function addHours(iso: string, hours: number): string {
   return addSeconds(iso, hours * 3600);
+}
+
+export function backoffSeconds(attempts: number): number {
+  return Math.min(300, 2 ** attempts * 2);
 }
 
 export function encodeCursor(row: { createdAt: string; id: string }): string {

@@ -6,7 +6,12 @@ import {
   RefundParams,
   RefundSchema,
 } from "../schemas";
-import { createRefund, getRefund, listRefunds } from "../services/refunds";
+import {
+  createRefund,
+  cancelRefund,
+  getRefund,
+  listRefunds,
+} from "../services/refunds";
 import { serializeRefund } from "../services/serializers";
 import { idempotencyKeyFrom, scenarioFrom } from "./payments";
 
@@ -40,6 +45,7 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
         scenario,
         idempotencyKey: idempotencyKeyFrom(request.headers),
         idempotencyTtlHours: app.config.idempotencyTtlHours,
+        maxJobAttempts: app.config.maxJobAttempts,
       });
 
       if (replayed) reply.header("Idempotency-Replayed", "true");
@@ -55,7 +61,10 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ["Refunds"],
         summary: "List refunds",
-        querystring: ListRefundsQuery,
+        querystring: ListRefundsQuery(
+          app.config.defaultPageSize,
+          app.config.maxPageSize,
+        ),
         response: { 200: RefundListSchema },
       },
     },
@@ -84,6 +93,24 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) => {
       return serializeRefund(
         getRefund(app.db, request.merchant.id, request.params.id),
+      );
+    },
+  );
+
+  app.post(
+    "/v1/refunds/:id/cancel",
+    {
+      preHandler: [app.authenticate],
+      schema: {
+        tags: ["Refunds"],
+        summary: "Cancel a reserved refund and release its capacity",
+        params: RefundParams,
+        response: { 200: RefundSchema },
+      },
+    },
+    async (request) => {
+      return serializeRefund(
+        cancelRefund(app.db, request.merchant.id, request.params.id),
       );
     },
   );
