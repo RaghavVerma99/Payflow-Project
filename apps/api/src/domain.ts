@@ -24,6 +24,42 @@ export const REFUND_STATUSES = [
 
 export type RefundStatus = (typeof REFUND_STATUSES)[number];
 
+export const PAYMENT_METHOD_TYPES = ["card", "upi", "bank", "wallet"] as const;
+
+export type PaymentMethodType = (typeof PAYMENT_METHOD_TYPES)[number];
+
+export const PAYOUT_STATUSES = [
+  "pending",
+  "processing",
+  "paid",
+  "failed",
+  "unknown",
+] as const;
+
+export type PayoutStatus = (typeof PAYOUT_STATUSES)[number];
+
+export const DISPUTE_STATUSES = ["open", "won", "lost"] as const;
+
+export type DisputeStatus = (typeof DISPUTE_STATUSES)[number];
+
+export const WEBHOOK_EVENT_TYPES = [
+  "payment.created",
+  "payment.succeeded",
+  "payment.failed",
+  "payment.canceled",
+  "payment.unknown",
+  "refund.succeeded",
+  "refund.failed",
+  "refund.canceled",
+  "payout.paid",
+  "payout.failed",
+  "dispute.opened",
+  "dispute.won",
+  "dispute.lost",
+] as const;
+
+export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
+
 const ALLOWED_TRANSITIONS: Record<PaymentStatus, readonly PaymentStatus[]> = {
   created: ["processing", "canceled"],
   processing: ["succeeded", "failed", "unknown"],
@@ -86,6 +122,28 @@ export const errors = {
       409,
       "Only reserved refunds can be canceled.",
     ),
+  paymentMethodInactive: () =>
+    new AppError(
+      "payment_method_not_active",
+      409,
+      "This payment method is disabled.",
+    ),
+  insufficientBalance: (message: string) =>
+    new AppError("insufficient_balance", 409, message),
+  disputeNotOpen: () =>
+    new AppError(
+      "dispute_not_open",
+      409,
+      "Only open disputes can be resolved.",
+    ),
+  paymentNotDisputable: () =>
+    new AppError(
+      "payment_not_disputable",
+      409,
+      "Only settled payments can be disputed.",
+    ),
+  invalidWebhookUrl: (message: string) =>
+    new AppError("invalid_webhook_url", 400, message),
   simulatorDisabled: () =>
     new AppError(
       "simulator_controls_disabled",
@@ -190,6 +248,7 @@ export function runSimulation(
   reference: string,
   scenario: Scenario,
   attemptNumber: number,
+  methodType: PaymentMethodType = "card",
 ): SimulationResult {
   switch (scenario) {
     case "approve":
@@ -216,11 +275,15 @@ export function runSimulation(
         : { outcome: "succeeded", reference, failureCode: null };
     case "auto":
     default: {
-      const bucket = hashToBucket(reference);
-      if (bucket < 78) {
+      const distribution = OUTCOME_DISTRIBUTIONS[methodType] ?? {
+        success: 78,
+        lookup: 16,
+      };
+      const bucket = hashToBucket(`${reference}:${methodType}`);
+      if (bucket < distribution.success) {
         return { outcome: "succeeded", reference, failureCode: null };
       }
-      if (bucket < 94) {
+      if (bucket < distribution.success + distribution.lookup) {
         return actualLookup(reference);
       }
       return {
@@ -231,6 +294,16 @@ export function runSimulation(
     }
   }
 }
+
+export const OUTCOME_DISTRIBUTIONS: Record<
+  PaymentMethodType,
+  { success: number; lookup: number }
+> = {
+  card: { success: 78, lookup: 16 },
+  upi: { success: 92, lookup: 5 },
+  bank: { success: 68, lookup: 22 },
+  wallet: { success: 84, lookup: 11 },
+};
 
 function actualLookup(reference: string): SimulationResult {
   const bucket = hashToBucket(`lookup:${reference}`);

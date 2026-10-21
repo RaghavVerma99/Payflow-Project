@@ -12,7 +12,22 @@ export const apiKeys = sqliteTable("api_keys", {
   merchantId: text("merchant_id").notNull(),
   keyPrefix: text("key_prefix").notNull(),
   keyHash: text("key_hash").notNull(),
+  name: text("name"),
   revokedAt: text("revoked_at"),
+  lastUsedAt: text("last_used_at"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const paymentMethods = sqliteTable("payment_methods", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull(),
+  type: text("type").notNull(),
+  label: text("label").notNull(),
+  last4: text("last4"),
+  network: text("network"),
+  expiryMonth: integer("expiry_month"),
+  expiryYear: integer("expiry_year"),
+  status: text("status").notNull().default("active"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -24,6 +39,7 @@ export const payments = sqliteTable("payments", {
   status: text("status").notNull().default("created"),
   customerId: text("customer_id"),
   description: text("description"),
+  paymentMethodId: text("payment_method_id"),
   failureCode: text("failure_code"),
   refundedMinor: integer("refunded_minor").notNull().default(0),
   refundReservedMinor: integer("refund_reserved_minor").notNull().default(0),
@@ -126,6 +142,77 @@ export const refunds = sqliteTable("refunds", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const webhookEndpoints = sqliteTable("webhook_endpoints", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull(),
+  url: text("url").notNull(),
+  secret: text("secret").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("active"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const webhookEvents = sqliteTable("webhook_events", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull(),
+  type: text("type").notNull(),
+  payload: text("payload").notNull(),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: text("next_attempt_at").notNull(),
+  lastError: text("last_error"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const webhookDeliveries = sqliteTable("webhook_deliveries", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id").notNull(),
+  endpointId: text("endpoint_id").notNull(),
+  merchantId: text("merchant_id").notNull(),
+  attempt: integer("attempt").notNull(),
+  status: text("status").notNull(),
+  responseStatus: integer("response_status"),
+  responseBody: text("response_body"),
+  error: text("error"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const payouts = sqliteTable("payouts", {
+  id: text("id").primaryKey(),
+  merchantId: text("merchant_id").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  currency: text("currency").notNull().default("INR"),
+  destination: text("destination").notNull(),
+  status: text("status").notNull().default("pending"),
+  failureCode: text("failure_code"),
+  processorReference: text("processor_reference"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const disputes = sqliteTable("disputes", {
+  id: text("id").primaryKey(),
+  paymentId: text("payment_id").notNull(),
+  merchantId: text("merchant_id").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("open"),
+  note: text("note"),
+  createdAt: text("created_at").notNull(),
+  resolvedAt: text("resolved_at"),
+});
+
+export const devSink = sqliteTable("dev_sink", {
+  id: text("id").primaryKey(),
+  token: text("token").notNull(),
+  eventId: text("event_id"),
+  eventType: text("event_type"),
+  body: text("body").notNull(),
+  signature: text("signature"),
+  receivedAt: text("received_at").notNull(),
+});
+
 export type PaymentRow = typeof payments.$inferSelect;
 export type PaymentAttemptRow = typeof paymentAttempts.$inferSelect;
 export type PaymentEventRow = typeof paymentEvents.$inferSelect;
@@ -134,3 +221,9 @@ export type AccountRow = typeof accounts.$inferSelect;
 export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
 export type RefundRow = typeof refunds.$inferSelect;
 export type IdempotencyRow = typeof idempotencyRecords.$inferSelect;
+export type PaymentMethodRow = typeof paymentMethods.$inferSelect;
+export type WebhookEndpointRow = typeof webhookEndpoints.$inferSelect;
+export type WebhookEventRow = typeof webhookEvents.$inferSelect;
+export type WebhookDeliveryRow = typeof webhookDeliveries.$inferSelect;
+export type PayoutRow = typeof payouts.$inferSelect;
+export type DisputeRow = typeof disputes.$inferSelect;

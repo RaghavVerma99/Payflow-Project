@@ -64,6 +64,38 @@ function migrateRefundStatus(sqlite: Database.Database): void {
   }
 }
 
+function tableColumns(
+  sqlite: Database.Database,
+  table: string,
+): string[] {
+  return (
+    sqlite.prepare(`pragma table_info(${table})`).all() as {
+      name: string;
+    }[]
+  ).map((row) => row.name);
+}
+
+function addColumnIfMissing(
+  sqlite: Database.Database,
+  table: string,
+  column: string,
+  definition: string,
+): void {
+  if (tableColumns(sqlite, table).includes(column)) return;
+  sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+}
+
+function migrateColumns(sqlite: Database.Database): void {
+  addColumnIfMissing(sqlite, "api_keys", "name", "TEXT");
+  addColumnIfMissing(sqlite, "api_keys", "last_used_at", "TEXT");
+  addColumnIfMissing(
+    sqlite,
+    "payments",
+    "payment_method_id",
+    "TEXT REFERENCES payment_methods(id)",
+  );
+}
+
 export function createDb(dbPath: string): DbHandle {
   if (dbPath !== ":memory:") {
     mkdirSync(dirname(dbPath), { recursive: true });
@@ -76,6 +108,7 @@ export function createDb(dbPath: string): DbHandle {
   sqlite.pragma("synchronous = NORMAL");
   sqlite.exec(SCHEMA_SQL);
   migrateRefundStatus(sqlite);
+  migrateColumns(sqlite);
 
   const db = drizzle(sqlite, { schema });
 

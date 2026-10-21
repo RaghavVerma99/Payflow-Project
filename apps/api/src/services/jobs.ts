@@ -7,7 +7,10 @@ export type JobKind =
   | "process_payment"
   | "reconcile_payment"
   | "process_refund"
-  | "reconcile_refund";
+  | "reconcile_refund"
+  | "process_payout"
+  | "reconcile_payout"
+  | "deliver_webhooks";
 
 export interface EnqueueOptions {
   kind: JobKind;

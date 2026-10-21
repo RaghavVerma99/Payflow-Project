@@ -11,6 +11,7 @@ import {
   decodeCursor,
   encodeCursor,
   errors,
+  formatMinor,
   newId,
   nowIso,
   parseScenario,
@@ -20,6 +21,8 @@ import {
 } from "../domain";
 import { enqueue, cancelPendingJobs } from "./jobs";
 import { withIdempotency } from "./idempotency";
+import { requireActivePaymentMethod } from "./payment-methods";
+import { emitWebhookEvent } from "./webhooks";
 import {
   serializeAttempt,
   serializeEvent,
@@ -33,6 +36,7 @@ export interface CreatePaymentInput {
   currency: string;
   customerId?: string | null;
   description?: string | null;
+  paymentMethodId?: string | null;
   scenario?: string | null;
   idempotencyKey?: string | null;
   idempotencyTtlHours: number;
@@ -60,6 +64,7 @@ export function createPayment(
       currency: "INR",
       customer_id: input.customerId ?? null,
       description: input.description ?? null,
+      payment_method_id: input.paymentMethodId ?? null,
       scenario,
     }),
   );
@@ -76,6 +81,11 @@ export function createPayment(
 
   const result = withIdempotency(db, idempotency, (tx) => {
     const now = nowIso();
+
+    if (input.paymentMethodId) {
+      requireActivePaymentMethod(tx, input.merchantId, input.paymentMethodId);
+    }
+
     const payment: PaymentRow = {
       id: newId("pay"),
       merchantId: input.merchantId,
@@ -84,6 +94,7 @@ export function createPayment(
       status: "created",
       customerId: input.customerId ?? null,
       description: input.description ?? null,
+      paymentMethodId: input.paymentMethodId ?? null,
       failureCode: null,
       refundedMinor: 0,
       refundReservedMinor: 0,
@@ -98,6 +109,14 @@ export function createPayment(
       aggregateId: payment.id,
       payload: { payment_id: payment.id, scenario },
       maxAttempts: input.maxJobAttempts,
+    });
+    emitWebhookEvent(tx, input.merchantId, "payment.created", {
+      id: payment.id,
+      status: payment.status,
+      amount_minor: payment.amountMinor,
+      amount: formatMinor(payment.amountMinor),
+      currency: payment.currency,
+      customer_id: payment.customerId,
     });
 
     return {

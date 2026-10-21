@@ -19,6 +19,11 @@ export const ACCOUNT_SPECS = [
     name: "Processor clearing",
     kind: "asset" as const,
   },
+  {
+    code: "merchant_bank",
+    name: "Merchant bank",
+    kind: "asset" as const,
+  },
 ];
 
 export type Direction = "debit" | "credit";
@@ -84,6 +89,20 @@ export function paymentJournalLines(amountMinor: number): JournalLine[] {
 }
 
 export function refundJournalLines(amountMinor: number): JournalLine[] {
+  return [
+    { code: "merchant_payable", direction: "debit", amountMinor },
+    { code: "processor_clearing", direction: "credit", amountMinor },
+  ];
+}
+
+export function payoutJournalLines(amountMinor: number): JournalLine[] {
+  return [
+    { code: "merchant_payable", direction: "debit", amountMinor },
+    { code: "merchant_bank", direction: "credit", amountMinor },
+  ];
+}
+
+export function disputeJournalLines(amountMinor: number): JournalLine[] {
   return [
     { code: "merchant_payable", direction: "debit", amountMinor },
     { code: "processor_clearing", direction: "credit", amountMinor },
@@ -280,6 +299,39 @@ export function accountSummaries(db: Db, merchantId: string): AccountSummary[] {
       balance_minor: balance,
     };
   });
+}
+
+export function accountBalance(
+  db: Db,
+  merchantId: string,
+  code: string,
+): number {
+  const row = db
+    .select({
+      direction: ledgerEntries.direction,
+      total: sql<number>`sum(${ledgerEntries.amountMinor})`,
+    })
+    .from(ledgerEntries)
+    .innerJoin(accounts, eq(accounts.id, ledgerEntries.accountId))
+    .where(and(eq(accounts.merchantId, merchantId), eq(accounts.code, code)))
+    .groupBy(ledgerEntries.direction)
+    .all();
+
+  let debits = 0;
+  let credits = 0;
+  for (const entry of row) {
+    if (entry.direction === "debit") debits += Number(entry.total);
+    else credits += Number(entry.total);
+  }
+
+  const account = db
+    .select({ kind: accounts.kind })
+    .from(accounts)
+    .where(and(eq(accounts.merchantId, merchantId), eq(accounts.code, code)))
+    .get();
+
+  if (!account) return 0;
+  return account.kind === "asset" ? debits - credits : credits - debits;
 }
 
 export function trialBalance(

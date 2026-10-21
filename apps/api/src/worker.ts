@@ -5,16 +5,29 @@ import { addPaymentEvent, transitionPayment } from "./services/payments";
 import { claimNextJob, completeJob, enqueue, failJob } from "./services/jobs";
 import {
   paymentJournalLines,
+  payoutJournalLines,
   postJournal,
   refundJournalLines,
 } from "./services/ledger";
 import {
+  emitPayoutEvent,
+  markPayoutFailed,
+  markPayoutPaid,
+} from "./services/payouts";
+import {
+  deliverToEndpoint,
+  emitWebhookEvent,
+  recordDelivery,
+} from "./services/webhooks";
+import {
   addSeconds,
+  formatMinor,
   lookupSimulation,
   newId,
   nowIso,
   parseScenario,
   runSimulation,
+  type PaymentMethodType,
   type PaymentStatus,
   type Scenario,
   type SimulationResult,
@@ -22,11 +35,18 @@ import {
 import {
   jobs,
   paymentAttempts,
+  paymentMethods,
   payments,
+  payouts,
   refunds,
+  webhookDeliveries,
+  webhookEndpoints,
+  webhookEvents,
   type JobRow,
   type PaymentRow,
+  type PayoutRow,
   type RefundRow,
+  type WebhookEventRow,
 } from "./schema";
 
 export interface WorkerLogger {
@@ -44,11 +64,13 @@ export interface WorkerContext {
 interface JobPayload {
   payment_id?: string;
   refund_id?: string;
+  payout_id?: string;
+  event_id?: string;
   scenario?: string;
   processor_reference?: string;
 }
 
-export function runOnce(ctx: WorkerContext): boolean {
+export async function runOnce(ctx: WorkerContext): Promise<boolean> {
   const job = claimNextJob(ctx.db, ctx.workerId, ctx.config.workerLeaseSeconds);
   if (!job) return false;
 
@@ -58,11 +80,14 @@ export function runOnce(ctx: WorkerContext): boolean {
   );
 
   try {
-    executeJob(ctx, job);
+    await executeJob(ctx, job);
     completeJob(ctx.db, job.id);
     ctx.logger?.info({ job_id: job.id, kind: job.kind }, "worker.completed");
   } catch (error) {
     const outcome = failJob(ctx.db, job.id, error, ctx.config.maxJobAttempts);
+    if (outcome === "dead") {
+      markEventDead(ctx, job);
+    }
     ctx.logger?.error(
       { job_id: job.id, kind: job.kind, outcome, err: String(error) },
       "worker.failed",
@@ -72,12 +97,23 @@ export function runOnce(ctx: WorkerContext): boolean {
   return true;
 }
 
-export function runDrain(ctx: WorkerContext, maxJobs = 50): number {
+export async function runDrain(ctx: WorkerContext, maxJobs = 50): Promise<number> {
   let processed = 0;
-  while (processed < maxJobs && runOnce(ctx)) {
+  while (processed < maxJobs && (await runOnce(ctx))) {
     processed += 1;
   }
   return processed;
+}
+
+function markEventDead(ctx: WorkerContext, job: JobRow): void {
+  if (job.kind !== "deliver_webhooks") return;
+  const payload = parsePayload(job);
+  if (!payload.event_id) return;
+  ctx.db
+    .update(webhookEvents)
+    .set({ status: "dead", updatedAt: nowIso() })
+    .where(eq(webhookEvents.id, payload.event_id))
+    .run();
 }
 
 function parsePayload(job: JobRow): JobPayload {
@@ -88,7 +124,7 @@ function parsePayload(job: JobRow): JobPayload {
   }
 }
 
-function executeJob(ctx: WorkerContext, job: JobRow): void {
+async function executeJob(ctx: WorkerContext, job: JobRow): Promise<void> {
   const payload = parsePayload(job);
 
   switch (job.kind) {
@@ -103,6 +139,18 @@ function executeJob(ctx: WorkerContext, job: JobRow): void {
         payload.payment_id,
         payload.processor_reference ?? null,
       );
+      return;
+    case "process_payout":
+      if (!payload.payout_id) throw new Error("Missing payout_id.");
+      processPayout(ctx, payload.payout_id, payload.scenario, job.attempts);
+      return;
+    case "reconcile_payout":
+      if (!payload.payout_id) throw new Error("Missing payout_id.");
+      reconcilePayout(ctx, payload.payout_id);
+      return;
+    case "deliver_webhooks":
+      if (!payload.event_id) throw new Error("Missing event_id.");
+      await deliverWebhook(ctx, payload.event_id);
       return;
     case "process_refund":
       if (!payload.refund_id) throw new Error("Missing refund_id.");
@@ -170,7 +218,15 @@ function processPayment(
         });
       }
 
-      return { attemptNumber: Number(attemptNumber), reference };
+      const methodType: PaymentMethodType = payment.paymentMethodId
+        ? ((t
+            .select({ type: paymentMethods.type })
+            .from(paymentMethods)
+            .where(eq(paymentMethods.id, payment.paymentMethodId))
+            .get()?.type as PaymentMethodType | undefined) ?? "card")
+        : "card";
+
+      return { attemptNumber: Number(attemptNumber), reference, methodType };
     },
     { behavior: "immediate" },
   );
@@ -181,6 +237,7 @@ function processPayment(
     prepared.reference,
     scenario,
     prepared.attemptNumber,
+    prepared.methodType,
   );
 
   const reconciliationReference = prepared.reference;
@@ -259,6 +316,13 @@ function applyPaymentOutcome(
         sourceId: payment.id,
         lines: paymentJournalLines(payment.amountMinor),
       });
+      emitWebhookEvent(tx, payment.merchantId, "payment.succeeded", {
+        id: payment.id,
+        status: "succeeded",
+        amount_minor: payment.amountMinor,
+        amount: formatMinor(payment.amountMinor),
+        currency: payment.currency,
+      });
       return;
     case "declined":
       transitionPayment(tx, payment.id, "failed", {
@@ -266,12 +330,24 @@ function applyPaymentOutcome(
         reason: "Processor declined the charge.",
         failureCode: result.failureCode,
       });
+      emitWebhookEvent(tx, payment.merchantId, "payment.failed", {
+        id: payment.id,
+        status: "failed",
+        amount_minor: payment.amountMinor,
+        amount: formatMinor(payment.amountMinor),
+        failure_code: result.failureCode,
+      });
       return;
     case "timeout":
       transitionPayment(tx, payment.id, "unknown", {
         eventType: "payment.unknown",
         reason: "Processor timed out; reconciliation scheduled.",
         failureCode: result.failureCode,
+      });
+      emitWebhookEvent(tx, payment.merchantId, "payment.unknown", {
+        id: payment.id,
+        status: "unknown",
+        amount_minor: payment.amountMinor,
       });
       return;
     case "error":
@@ -556,16 +632,16 @@ export function startWorker(
 
   const tick = () => {
     if (stopped) return;
-    try {
-      runDrain(ctx, maxJobsPerTick);
-    } catch (error) {
-      ctx.logger?.error({ err: String(error) }, "worker.tick_failed");
-    } finally {
-      if (!stopped) {
-        timer = setTimeout(tick, pollMs);
-        timer.unref();
-      }
-    }
+    void runDrain(ctx, maxJobsPerTick)
+      .catch((error) => {
+        ctx.logger?.error({ err: String(error) }, "worker.tick_failed");
+      })
+      .finally(() => {
+        if (!stopped) {
+          timer = setTimeout(tick, pollMs);
+          timer.unref();
+        }
+      });
   };
 
   timer = setTimeout(tick, 25);
@@ -586,4 +662,231 @@ export function jobQueueDepth(db: Db): number {
     .where(sql`${jobs.status} in ('pending','retrying','running')`)
     .get();
   return Number(row?.value ?? 0);
+}
+
+function loadPayout(db: Db, payoutId: string): PayoutRow {
+  const payout = db
+    .select()
+    .from(payouts)
+    .where(eq(payouts.id, payoutId))
+    .get();
+  if (!payout) throw new Error(`Payout ${payoutId} does not exist.`);
+  return payout;
+}
+
+function processPayout(
+  ctx: WorkerContext,
+  payoutId: string,
+  rawScenario: string | undefined,
+  attemptNumber: number,
+): void {
+  const scenario: Scenario = parseScenario(rawScenario);
+
+  const prepared = ctx.db.transaction(
+    (tx) => {
+      const t = tx as unknown as Db;
+      const payout = loadPayout(t, payoutId);
+      if (!["pending", "processing"].includes(payout.status)) return null;
+
+      const reference = payout.processorReference ?? newId("proc");
+      t.update(payouts)
+        .set({
+          status: "processing",
+          processorReference: reference,
+          updatedAt: nowIso(),
+        })
+        .where(eq(payouts.id, payoutId))
+        .run();
+
+      return { reference };
+    },
+    { behavior: "immediate" },
+  );
+
+  if (!prepared) return;
+
+  const result = runSimulation(
+    prepared.reference,
+    scenario,
+    Math.max(1, attemptNumber),
+  );
+
+  ctx.db.transaction(
+    (tx) => {
+      const t = tx as unknown as Db;
+      const payout = loadPayout(t, payoutId);
+      if (!["pending", "processing"].includes(payout.status)) return;
+
+      if (result.outcome === "succeeded") {
+        markPayoutPaid(t, payout, prepared.reference);
+        postJournal(t, {
+          merchantId: payout.merchantId,
+          sourceType: "payout",
+          sourceId: payout.id,
+          lines: payoutJournalLines(payout.amountMinor),
+        });
+        emitPayoutEvent(t, { ...payout, status: "paid" }, "payout.paid");
+        return;
+      }
+
+      if (result.outcome === "declined") {
+        markPayoutFailed(
+          t,
+          payout,
+          prepared.reference,
+          result.failureCode ?? "payout_failed",
+        );
+        emitPayoutEvent(t, { ...payout, status: "failed" }, "payout.failed");
+        return;
+      }
+
+      if (result.outcome === "timeout") {
+        t.update(payouts)
+          .set({
+            status: "unknown",
+            failureCode: result.failureCode,
+            updatedAt: nowIso(),
+          })
+          .where(eq(payouts.id, payoutId))
+          .run();
+        enqueue(t, {
+          kind: "reconcile_payout",
+          aggregateId: payoutId,
+          payload: { payout_id: payoutId },
+          runAt: addSeconds(nowIso(), 5),
+          maxAttempts: ctx.config.maxJobAttempts,
+        });
+        return;
+      }
+
+      t.update(payouts)
+        .set({ status: "pending", updatedAt: nowIso() })
+        .where(eq(payouts.id, payoutId))
+        .run();
+    },
+    { behavior: "immediate" },
+  );
+
+  if (result.outcome === "error") {
+    throw new Error(result.failureCode ?? "processor_unavailable");
+  }
+}
+
+function reconcilePayout(ctx: WorkerContext, payoutId: string): void {
+  const payout = loadPayout(ctx.db, payoutId);
+  if (payout.status !== "unknown") return;
+  if (!payout.processorReference) {
+    throw new Error(`No processor reference for payout ${payoutId}.`);
+  }
+
+  const result = lookupSimulation(payout.processorReference);
+
+  ctx.db.transaction(
+    (tx) => {
+      const t = tx as unknown as Db;
+      const current = loadPayout(t, payoutId);
+      if (current.status !== "unknown") return;
+
+      if (result.outcome === "succeeded") {
+        markPayoutPaid(t, current, current.processorReference as string);
+        postJournal(t, {
+          merchantId: current.merchantId,
+          sourceType: "payout",
+          sourceId: current.id,
+          lines: payoutJournalLines(current.amountMinor),
+        });
+        emitPayoutEvent(t, { ...current, status: "paid" }, "payout.paid");
+        return;
+      }
+
+      if (result.outcome === "declined") {
+        markPayoutFailed(
+          t,
+          current,
+          current.processorReference as string,
+          result.failureCode ?? "payout_failed",
+        );
+        emitPayoutEvent(t, { ...current, status: "failed" }, "payout.failed");
+      }
+    },
+    { behavior: "immediate" },
+  );
+}
+
+async function deliverWebhook(ctx: WorkerContext, eventId: string): Promise<void> {
+  const event = ctx.db
+    .select()
+    .from(webhookEvents)
+    .where(eq(webhookEvents.id, eventId))
+    .get();
+
+  if (!event) throw new Error(`Webhook event ${eventId} does not exist.`);
+  if (event.status === "delivered" || event.status === "dead") return;
+
+  const endpoints = ctx.db
+    .select()
+    .from(webhookEndpoints)
+    .where(
+      and(
+        eq(webhookEndpoints.merchantId, event.merchantId),
+        eq(webhookEndpoints.status, "active"),
+      ),
+    )
+    .all();
+
+  if (endpoints.length === 0) {
+    ctx.db
+      .update(webhookEvents)
+      .set({ status: "delivered", updatedAt: nowIso() })
+      .where(eq(webhookEvents.id, eventId))
+      .run();
+    return;
+  }
+
+  const delivered = new Set(
+    ctx.db
+      .select({ endpointId: webhookDeliveries.endpointId })
+      .from(webhookDeliveries)
+      .where(
+        and(
+          eq(webhookDeliveries.eventId, eventId),
+          eq(webhookDeliveries.status, "delivered"),
+        ),
+      )
+      .all()
+      .map((row) => row.endpointId),
+  );
+
+  const attempt = event.attempts + 1;
+  let failures = 0;
+  let lastError: string | null = null;
+
+  for (const endpoint of endpoints) {
+    if (delivered.has(endpoint.id)) continue;
+
+    const result = await deliverToEndpoint(endpoint, event, attempt);
+    recordDelivery(ctx.db, { event, attempt, result });
+
+    if (result.status === "failed") {
+      failures += 1;
+      lastError = result.error;
+    }
+  }
+
+  ctx.db
+    .update(webhookEvents)
+    .set({
+      status: failures > 0 ? "failed" : "delivered",
+      attempts: attempt,
+      lastError,
+      updatedAt: nowIso(),
+    })
+    .where(eq(webhookEvents.id, eventId))
+    .run();
+
+  if (failures > 0) {
+    throw new Error(
+      `Webhook event ${eventId} failed on ${failures} endpoint(s): ${lastError ?? "unknown error"}`,
+    );
+  }
 }
