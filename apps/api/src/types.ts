@@ -1,5 +1,4 @@
 import type Database from "better-sqlite3";
-import type { FastifyReply, FastifyRequest } from "fastify";
 import type { AppConfig } from "./config";
 import type { Db } from "./db";
 

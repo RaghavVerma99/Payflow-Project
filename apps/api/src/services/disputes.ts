@@ -20,10 +20,7 @@ export interface CreateDisputeInput {
   note?: string | null;
 }
 
-export function createDispute(
-  db: Db,
-  input: CreateDisputeInput,
-): DisputeRow {
+export function createDispute(db: Db, input: CreateDisputeInput): DisputeRow {
   return db.transaction(
     (tx) => {
       const t = tx as unknown as Db;
@@ -131,12 +128,17 @@ export function resolveDispute(
         .where(eq(disputes.id, dispute.id))
         .run();
 
-      emitWebhookEvent(t, merchantId, outcome === "won" ? "dispute.won" : "dispute.lost", {
-        id: dispute.id,
-        payment_id: dispute.paymentId,
-        amount_minor: dispute.amountMinor,
-        status: outcome,
-      });
+      emitWebhookEvent(
+        t,
+        merchantId,
+        outcome === "won" ? "dispute.won" : "dispute.lost",
+        {
+          id: dispute.id,
+          payment_id: dispute.paymentId,
+          amount_minor: dispute.amountMinor,
+          status: outcome,
+        },
+      );
 
       return { ...dispute, status: outcome, resolvedAt: now };
     },

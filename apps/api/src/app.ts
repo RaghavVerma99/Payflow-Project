@@ -24,10 +24,22 @@ import { createDb } from "./db";
 import { AppError, errors, newId } from "./domain";
 import type { MerchantContext } from "./types";
 import { healthRoutes } from "./routes/health";
+import { metaRoutes } from "./routes/meta";
+import { methodRoutes } from "./routes/methods";
 import { paymentRoutes } from "./routes/payments";
+import { platformRoutes } from "./routes/platform";
 import { readRoutes } from "./routes/read";
 import { refundRoutes } from "./routes/refunds";
+import { treasuryRoutes } from "./routes/treasury";
+import { webhookRoutes } from "./routes/webhooks";
 import { resolveApiKey } from "./services/auth";
+import {
+  API_DESCRIPTION,
+  API_TAGS,
+  API_TITLE,
+  API_VERSION,
+} from "./version";
+import { touchApiKey } from "./services/api-keys";
 import "./types";
 
 export interface CreateAppOptions {
@@ -75,11 +87,13 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
       const merchant = resolveApiKey(handle.db, raw, config.apiKeyPepper);
       if (!merchant) throw errors.unauthorized();
       request.merchant = merchant;
+      touchApiKey(handle.db, merchant.keyId);
     },
   );
 
   app.addHook("onSend", async (request, reply, payload) => {
     reply.header("x-request-id", request.id);
+    reply.header("x-payflow-api-version", API_VERSION);
     return payload;
   });
 
@@ -153,25 +167,20 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
     openapi: {
       openapi: "3.1.0",
       info: {
-        title: "PayFlow API",
-        version: "1.0.0",
-        description: [
-          "Payment processing simulator: idempotent payment creation, an explicit",
-          "state machine, asynchronous processing with retries, double-entry",
-          "accounting and refunds.",
-          "",
-          "**No real card data is accepted and no real money moves.**",
-        ].join("\n"),
+        title: API_TITLE,
+        version: API_VERSION,
+        description: API_DESCRIPTION,
+        contact: {
+          name: "PayFlow simulator",
+          url: "https://example.invalid/payflow",
+        },
+        license: { name: "UNLICENSED" },
       },
-      servers: [{ url: "/", description: "Current host" }],
-      tags: [
-        { name: "Payments", description: "Create and inspect payments" },
-        { name: "Refunds", description: "Refund succeeded payments" },
-        { name: "Ledger", description: "Double-entry accounts and journals" },
-        { name: "Analytics", description: "Dashboard aggregates" },
-        { name: "Merchants", description: "Authenticated merchant context" },
-        { name: "System", description: "Health and developer utilities" },
+      servers: [
+        { url: "/", description: "Current host" },
+        { url: "http://localhost:4000", description: "Local development" },
       ],
+      tags: API_TAGS,
       components: {
         securitySchemes: {
           bearerAuth: {
@@ -196,8 +205,13 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
   });
 
   void app.register(healthRoutes);
+  void app.register(metaRoutes);
   void app.register(paymentRoutes);
   void app.register(refundRoutes);
+  void app.register(methodRoutes);
+  void app.register(treasuryRoutes);
+  void app.register(webhookRoutes);
+  void app.register(platformRoutes);
   void app.register(readRoutes);
 
   const serveStatic = options.serveStatic ?? config.env !== "test";
@@ -219,7 +233,8 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
       url.startsWith("/v1") ||
       url.startsWith("/health") ||
       url.startsWith("/docs") ||
-      url.startsWith("/openapi");
+      url.startsWith("/openapi") ||
+      url.startsWith("/_sink");
 
     if (!isApi && hasWebBuild) {
       return reply.sendFile("index.html");

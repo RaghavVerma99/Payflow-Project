@@ -2,6 +2,7 @@ import {
   BookOpen,
   CreditCard,
   ExternalLink,
+  Landmark,
   LayoutDashboard,
   Layers,
   LogOut,
@@ -10,6 +11,8 @@ import {
   RotateCcw,
   Sun,
   Terminal,
+  Wallet,
+  Webhook,
   X,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
@@ -29,6 +32,9 @@ const NAV = [
   { to: "/ledger", label: "Ledger", icon: BookOpen, index: "04" },
   { to: "/playground", label: "Playground", icon: Terminal, index: "05" },
   { to: "/guide", label: "Architecture", icon: Layers, index: "06" },
+  { to: "/methods", label: "Methods", icon: Wallet, index: "07" },
+  { to: "/treasury", label: "Treasury", icon: Landmark, index: "08" },
+  { to: "/webhooks", label: "Webhooks", icon: Webhook, index: "09" },
 ];
 
 const TITLES: Record<string, string> = {
@@ -38,6 +44,9 @@ const TITLES: Record<string, string> = {
   "/ledger": "Ledger",
   "/playground": "API Playground",
   "/guide": "Architecture",
+  "/methods": "Payment Methods",
+  "/treasury": "Treasury",
+  "/webhooks": "Webhooks",
 };
 
 export function Logo({ compact = false }: { compact?: boolean }) {

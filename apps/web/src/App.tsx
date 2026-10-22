@@ -6,10 +6,13 @@ import { AuthProvider, useAuth } from "./lib/auth";
 import { GuidePage } from "./pages/guide";
 import { LedgerPage } from "./pages/ledger";
 import { LoginPage } from "./pages/login";
+import { MethodsPage } from "./pages/methods";
 import { OverviewPage } from "./pages/overview";
 import { PaymentsPage } from "./pages/payments";
 import { PlaygroundPage } from "./pages/playground";
 import { RefundsPage } from "./pages/refunds";
+import { TreasuryPage } from "./pages/treasury";
+import { WebhooksPage } from "./pages/webhooks";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,6 +53,9 @@ function Console() {
           <Route path="payments" element={<PaymentsPage />} />
           <Route path="refunds" element={<RefundsPage />} />
           <Route path="ledger" element={<LedgerPage />} />
+          <Route path="methods" element={<MethodsPage />} />
+          <Route path="treasury" element={<TreasuryPage />} />
+          <Route path="webhooks" element={<WebhooksPage />} />
           <Route path="playground" element={<PlaygroundPage />} />
           <Route path="guide" element={<GuidePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

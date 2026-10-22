@@ -91,35 +91,11 @@ export function CardTitle({
   );
 }
 
-export function CardDescription({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLParagraphElement>) {
-  return (
-    <p className={cn("text-xs text-muted-foreground", className)} {...props} />
-  );
-}
-
 export function CardContent({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("p-5", className)} {...props} />;
-}
-
-export function CardFooter({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn(
-        "flex items-center border-t border-border px-5 py-3",
-        className,
-      )}
-      {...props}
-    />
-  );
 }
 
 const badgeVariants = cva(
@@ -294,8 +270,6 @@ export function TableCell({
 }
 
 export const Dialog = DialogPrimitive.Root;
-export const DialogTrigger = DialogPrimitive.Trigger;
-export const DialogClose = DialogPrimitive.Close;
 
 export const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,

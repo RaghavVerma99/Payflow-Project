@@ -29,9 +29,9 @@ This document is the understanding.
 
 ---
 
-# Part I — The twelve concepts
+# Part I — The sixteen concepts
 
-PayFlow is twelve ideas wearing a payment costume. Learn these and the codebase
+PayFlow is sixteen ideas wearing a payment costume. Learn these and the codebase
 becomes predictable.
 
 | #   | Concept                 | The claim                                                 | Where                           |
@@ -48,6 +48,10 @@ becomes predictable.
 | 10  | Double-entry accounting | Debits = credits, always                                  | `services/ledger.ts`            |
 | 11  | Keyset pagination       | Stable cursors over moving data                           | `domain.ts`                     |
 | 12  | Cache invalidation      | The UI must reflect the server                            | `apps/web/src`                  |
+| 13  | Transactional outbox    | The event is written with the change, then delivered      | `services/webhooks.ts`          |
+| 14  | Signed payloads         | The receiver proves authenticity                          | `services/webhooks.ts`          |
+| 15  | Tokenized instruments   | No card number is ever stored                             | `services/payment-methods.ts`   |
+| 16  | Derived balance guards  | Payouts are bounded by what was actually collected        | `services/payouts.ts`           |
 
 ---
 
@@ -505,6 +509,101 @@ inputs, so their cached copies are stale by definition.)
 
 ---
 
+### 13. The transactional outbox
+
+**Concept.** If a business change must notify someone else, the notification
+must be written in the same transaction as the change. Otherwise there is a
+window where the money moved and the message was lost, or the message was sent
+for a change that rolled back.
+
+**The implementation**
+
+```text
+BEGIN IMMEDIATE
+  UPDATE payments SET status = 'succeeded' …
+  INSERT ledger_transactions / ledger_entries …
+  INSERT webhook_events (status = 'pending', payload = …)
+  INSERT jobs (kind = 'deliver_webhooks', aggregate_id = event id)
+COMMIT
+```
+
+The event is a row, not a message on a wire. A separate worker picks it up
+later, so a slow or dead endpoint cannot slow down or fail the payment.
+
+**Delivery is per endpoint.** One event may have several endpoints. The worker
+delivers to each active endpoint, records a `webhook_deliveries` row per
+attempt, and never delivers twice to an endpoint that already succeeded — the
+successful endpoints are read back from the delivery log before a retry.
+
+**Know it if you can answer:** what is the failure mode of publishing to a queue
+_before_ committing the business change? (The event can be delivered for a
+change that never committed. The outbox inverts the order and makes the two
+atomic.)
+
+### 14. Signed payloads
+
+**Concept.** A receiver must be able to prove that a payload came from you and
+was not modified in transit.
+
+```ts
+const signature = createHmac("sha256", secret)
+  .update(`${timestamp}.${body}`)
+  .digest("hex");
+```
+
+The header is `X-PayFlow-Signature: t=<unix-seconds>,v1=<hex>`. The receiver
+recomputes the HMAC over `timestamp + "." + body` and compares. Including the
+timestamp in the signed material means a captured payload cannot be replayed
+indefinitely; the receiver chooses its own tolerance window.
+
+The secret is returned once, at endpoint creation, and stored hashed-free but
+never re-displayed.
+
+**Know it if you can answer:** why sign `timestamp.body` instead of `body`?
+(The timestamp binds the signature to a moment, so a captured payload is
+rejected outside the receiver's tolerance window.)
+
+### 15. Tokenized instruments
+
+**Concept.** A payment method is a reference to an instrument the merchant
+already holds, not a copy of the instrument.
+
+```text
+pm_9f2c…   card   "Acme corporate card"   last4 4242   visa   11/2030
+```
+
+There is no card number field, because there is no card number to store. A
+method can be disabled, which makes it unusable for new payments while leaving
+existing payments untouched. The instrument also changes the simulated
+outcome distribution, so a UPI payment is not a card payment with a different
+label.
+
+**Know it if you can answer:** what breaks if a merchant stores the last four
+digits and the network? (Nothing that matters for the simulator: there is no
+authorization to perform, only a deterministic outcome to produce.)
+
+### 16. Balance-bounded movements
+
+**Concept.** Some operations are only legal against a balance the merchant
+actually holds. Because balances are derived from journal entries rather than
+stored, the guard is a read inside the write transaction:
+
+```ts
+const available = accountBalance(tx, merchantId, "merchant_payable");
+if (available < amount) throw errors.insufficientBalance(…);
+```
+
+The `IMMEDIATE` transaction holds the write lock, so the balance cannot move
+between the check and the journal that follows it.
+
+**Know it if you can answer:** why is a read inside the transaction safe here,
+when the refund reservation needed a conditional `UPDATE`? (Because
+`IMMEDIATE` takes the write lock at the start of the transaction, so no other
+writer can change the balance between the read and the write. A conditional
+`UPDATE` is still used where the invariant must also hold in the database.)
+
+---
+
 # Part II — End-to-end traces
 
 ### The four paths
@@ -514,9 +613,14 @@ flowchart TB
     W["WRITE<br/>auth → validate → transaction<br/>payment + event + job + idempotency → 202"]
     P["PROCESS<br/>claim → attempt → simulator → transition"]
     R["MONEY<br/>settled event → balanced journal → balances"]
+    N["NOTIFY<br/>outbox event → signed delivery → attempt log"]
     V["READ<br/>merchant-scoped queries → live rows + aggregates"]
 
-    W --> P --> R --> V
+    W --> P
+    P --> R
+    P --> N
+    R --> V
+    N --> V
 ```
 
 ---
@@ -692,6 +796,84 @@ Two attempts may exist. One settlement does.
 
 ---
 
+### Trace 8 — A webhook delivery
+
+```text
+POST /v1/payments                       → payment created, event written
+BEGIN IMMEDIATE
+  INSERT payments (status = 'created')
+  INSERT webhook_events (type = 'payment.created', status = 'pending')
+  INSERT jobs (kind = 'deliver_webhooks', aggregate_id = evt_…)
+COMMIT
+        │
+        ▼  worker claims the delivery job
+   POST https://merchant/hook
+     headers: x-payflow-event: payment.created
+              x-payflow-event-id: evt_…
+              x-payflow-delivery: evt_….1
+              x-payflow-signature: t=1799999999,v1=<hmac>
+        │
+        ├── 2xx → delivery row (delivered) → event status 'delivered'
+        └── else → delivery row (failed) → event status 'failed'
+                    → job retried with backoff → endpoints already
+                      delivered are skipped on the next attempt
+```
+
+A delivery that exhausts its retry budget marks the event `dead`. The event
+rows and the delivery rows are both readable, so a merchant can always answer
+"did you get it, and what did you get?".
+
+### Trace 9 — A payout
+
+```text
+POST /v1/payouts { amount_minor: 5000, destination: "bank://hdfc-7788" }
+        │
+        ▼
+BEGIN IMMEDIATE
+  available = accountBalance(merchant_payable)   ← derived from journal entries
+  if available < 5000 → 409 insufficient_balance
+  INSERT payouts (status = 'pending')
+  INSERT jobs (kind = 'process_payout')
+COMMIT
+        │
+        ▼  worker
+  payout → processing, processor reference assigned
+  simulate → succeeded
+  BEGIN IMMEDIATE
+    UPDATE payouts SET status = 'paid'
+    INSERT ledger_transactions (source_type = 'payout', source_id = payout id)
+    INSERT ledger_entries  merchant_payable   DEBIT   5,000
+                        processor_clearing CREDIT  5,000
+    INSERT webhook_events (payout.paid)
+  COMMIT
+```
+
+A payout timeout becomes `unknown` and is reconciled exactly like a payment
+timeout.
+
+### Trace 10 — A lost dispute
+
+```text
+POST /v1/disputes { payment_id: pay_…, amount_minor: 2000, reason: "not received" }
+        │
+        ▼  payment must be succeeded or partially_refunded
+   dispute (status = 'open') + dispute.opened event
+        │
+        ▼  POST /v1/disputes/:id/resolve { outcome: "lost" }
+   BEGIN IMMEDIATE
+     INSERT ledger_transactions (source_type = 'dispute', source_id = dispute id)
+     INSERT ledger_entries  merchant_payable   DEBIT   2,000
+                         processor_clearing CREDIT  2,000
+     UPDATE disputes SET status = 'lost', resolved_at = now
+     INSERT webhook_events (dispute.lost)
+   COMMIT
+```
+
+A won dispute posts nothing: the merchant keeps the claim, so there is no
+movement to record.
+
+---
+
 # Part III — The money, worked out
 
 ### Balance algebra
@@ -717,6 +899,21 @@ refundable_minor = amount_minor − refunded_minor − refund_reserved_minor
 | Refund on B (full)    | −10,000 |   19,900 |  19,900 |     44,900 |        44,900 |
 | **Trial balance**     |         |          |         | **44,900** | **44,900** ✅ |
 
+### What moves the two accounts
+
+| Business event   | `processor_clearing` (asset) | `merchant_payable` (liability) |
+| ---------------- | ---------------------------- | ------------------------------ |
+| Payment succeeds | +amount (debit)              | +amount (credit)               |
+| Refund succeeds  | −amount (credit)             | −amount (debit)                |
+| Payout paid      | −amount (credit)             | −amount (debit)                |
+| Dispute lost     | −amount (credit)             | −amount (debit)                |
+| Dispute won      | unchanged                    | unchanged                      |
+
+A refund reverses a specific payment; a payout settles the accumulated
+balance; a lost dispute returns money to the processor. All three reduce the
+merchant's claim and the clearing balance by the same amount, so the two
+accounts stay equal in a healthy merchant.
+
 ### Net volume is not the ledger balance
 
 | Number         | Definition                          | Source      |
@@ -727,7 +924,10 @@ refundable_minor = amount_minor − refunded_minor − refund_reserved_minor
 | Ledger balance | `Σ debits − Σ credits` per account  | `ledger.ts` |
 
 They agree in a healthy system. When they disagree, look for a failed refund
-(released reservation) or a payment that settled without a journal.
+(released reservation) or a payment that settled without a journal. The
+settlement report is the bridge: it subtracts refunds, dispute losses, and
+payouts from captured volume, and the result should equal the change in the
+payable balance over the same day.
 
 ### Success rate
 
@@ -778,7 +978,23 @@ flowchart LR
 | `components/ui.tsx`           | Buttons, cards, badges, inputs, table, dialog, tabs, toasts    |
 | `components/status.tsx`       | Status → label + icon + semantic colour                        |
 | `components/volume-chart.tsx` | Recharts area with gradient, peak marker, crafted tooltip      |
+| `pages/methods.tsx`           | Instruments: create, disable, filter                           |
+| `pages/webhooks.tsx`          | Endpoints, the one-time secret, events, deliveries, sink       |
+| `pages/treasury.tsx`          | Payouts and disputes, with the payable balance in view         |
 | `pages/guide.tsx`             | The in-app architecture chapter                                |
+
+### The console routes
+
+| Route         | Reads                               | Writes                                  |
+| ------------- | ----------------------------------- | --------------------------------------- |
+| `/`           | Overview, time series               | —                                       |
+| `/payments`   | Payments, one payment, its refunds  | Create, cancel, refund                  |
+| `/refunds`    | Refunds                             | —                                       |
+| `/ledger`     | Accounts, journals                  | —                                       |
+| `/methods`    | Payment methods                     | Create, disable                         |
+| `/webhooks`   | Endpoints, events, deliveries, sink | Create, disable                         |
+| `/treasury`   | Payouts, disputes, accounts         | Create payout, open and resolve dispute |
+| `/playground` | —                                   | Raw requests, including cURL output     |
 
 ---
 
@@ -786,16 +1002,22 @@ flowchart LR
 
 ### Decision table
 
-| I want to…               | Touch                                                                                  | Watch out for                                                              |
-| ------------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Add a payment status     | `domain.ts` (`PAYMENT_STATUSES`, `ALLOWED_TRANSITIONS`), `schemas.ts`, `schema-sql.ts` | The DB `CHECK` is the contract; existing files need a rebuild or migration |
-| Add a refund status      | `REFUND_STATUSES`, `schema-sql.ts` (`refunds`), `web/src/lib/api.ts`                   | `unknown` must be allowed in the `refunds` CHECK                           |
-| Add an endpoint          | `routes/*.ts` + a service function                                                     | Zod request _and_ response schemas; `preHandler: [app.authenticate]`       |
-| Change a response field  | `services/serializers.ts`, `schemas.ts`, `web/src/lib/api.ts`                          | The web client type changes in the same commit                             |
-| Change the ledger        | `services/ledger.ts`                                                                   | Journals must stay balanced; entries are immutable                         |
-| Change retry behaviour   | `services/jobs.ts`, `domain.ts` (`backoffSeconds`), `config.ts`                        | One source of truth for the formula                                        |
-| Add a simulator scenario | `domain.ts` (`SCENARIOS`, `runSimulation`), `web/src/lib/api.ts`, playground presets   | Production keeps simulator controls off                                    |
-| Add a console page       | `pages/*.tsx`, `App.tsx`, `layout.tsx` (`NAV` + `TITLES`)                              | Add a title or the header shows "PayFlow"                                  |
+| I want to…                  | Touch                                                                                  | Watch out for                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Add a payment status        | `domain.ts` (`PAYMENT_STATUSES`, `ALLOWED_TRANSITIONS`), `schemas.ts`, `schema-sql.ts` | The DB `CHECK` is the contract; existing files need a rebuild or migration |
+| Add a refund status         | `REFUND_STATUSES`, `schema-sql.ts` (`refunds`), `web/src/lib/api.ts`                   | `unknown` must be allowed in the `refunds` CHECK                           |
+| Add an endpoint             | `routes/*.ts` + a service function                                                     | Zod request _and_ response schemas; `preHandler: [app.authenticate]`       |
+| Change a response field     | `services/serializers.ts`, `schemas.ts`, `web/src/lib/api.ts`                          | The web client type changes in the same commit                             |
+| Change the ledger           | `services/ledger.ts`                                                                   | Journals must stay balanced; entries are immutable                         |
+| Change retry behaviour      | `services/jobs.ts`, `domain.ts` (`backoffSeconds`), `config.ts`                        | One source of truth for the formula                                        |
+| Add a simulator scenario    | `domain.ts` (`SCENARIOS`, `runSimulation`), `web/src/lib/api.ts`, playground presets   | Production keeps simulator controls off                                    |
+| Add a console page          | `pages/*.tsx`, `App.tsx`, `layout.tsx` (`NAV` + `TITLES`)                              | Add a title or the header shows "PayFlow"                                  |
+| Add a payment method        | `services/payment-methods.ts`, `routes/methods.ts`                                     | A card needs a four-digit `last4`; there is no PAN field                   |
+| Add a webhook event         | `domain.ts` (`WEBHOOK_EVENT_TYPES`), `services/webhooks.ts`                            | Emit it inside the business transaction, never after                       |
+| Change the webhook contract | `services/webhooks.ts` (`signPayload`, payload shape)                                  | The signature covers `timestamp.body`; changing it breaks receivers        |
+| Add a payout rule           | `services/payouts.ts`, `services/ledger.ts`                                            | Payouts post journals through the ledger service                           |
+| Add a dispute rule          | `services/disputes.ts`, `services/ledger.ts`                                           | A lost dispute posts a reversing journal; a won dispute posts nothing      |
+| Add a report                | `services/reports.ts`, `routes/platform.ts`                                            | Amounts stay integer minor units; the CSV export mirrors the JSON          |
 
 ### Change recipes
 
@@ -853,6 +1075,13 @@ expect((await getPayment(response.json().id)).json().status).toBe("succeeded");
 | `401` in the console          | `localStorage.payflow_api_key`                                               | The key rotated on re-seed                                        |
 | `429`                         | Rate limit 600/min                                                           | Lower the polling rate or raise the limit                         |
 | `SQLITE_BUSY`                 | `busy_timeout`                                                               | A long write or an external tool holding the file                 |
+| Payout `409`                  | `merchant_payable` balance in `accounts`                                     | The merchant has not collected that much yet                      |
+| Payout stuck in `pending`     | `jobs` where `kind = 'process_payout'`                                       | Worker down, or the job is not due yet                            |
+| Dispute `409`                 | `disputes.status`                                                            | Already resolved; only `open` disputes can be resolved            |
+| Webhook event `failed`        | `webhook_deliveries` for that event                                          | The endpoint rejected or timed out; the job retries with backoff  |
+| Webhook event `dead`          | `jobs` where `kind = 'deliver_webhooks'`                                     | The retry budget was exhausted; re-register the endpoint          |
+| No webhook deliveries         | `webhook_endpoints` for the merchant                                         | No active endpoint, so the event is marked delivered              |
+| Signature rejected by a sink  | `x-payflow-signature` on the delivery                                        | The receiver recomputed over a different body or timestamp        |
 
 ```sql
 select kind, status, attempts, max_attempts, next_run_at, last_error
@@ -864,6 +1093,18 @@ select id, status, refunded_minor, refund_reserved_minor, amount_minor
 select * from payment_events where payment_id = 'pay_…' order by created_at;
 
 select direction, sum(amount_minor) as total from ledger_entries group by direction;
+
+select id, type, status, attempts, last_error from webhook_events
+  order by created_at desc limit 10;
+
+select event_id, endpoint_id, attempt, status, response_status, error
+  from webhook_deliveries order by created_at desc limit 10;
+
+select id, status, amount_minor, destination, failure_code from payouts
+  order by created_at desc limit 10;
+
+select id, payment_id, status, amount_minor, reason from disputes
+  order by created_at desc limit 10;
 ```
 
 ### Quality gate
@@ -882,42 +1123,53 @@ without a green gate.
 
 Each lab takes two minutes and produces an observation you can defend.
 
-| #   | Lab                 | Do this                                                 | Observe                                                                  |
-| --- | ------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1   | Idempotent replay   | `POST /v1/payments` twice, same key and body            | Same `id`; second response has `Idempotency-Replayed: true`              |
-| 2   | Key misuse          | Same key, different amount                              | `409 idempotency_key_reused`                                             |
-| 3   | Approve             | `simulator_scenario: "approve"`, then `GET` the payment | `succeeded`, 3 events, 1 attempt, 1 journal                              |
-| 4   | Decline             | `simulator_scenario: "decline"`                         | `failed`, `card_declined`, **no** journal                                |
-| 5   | Timeout → reconcile | `simulator_scenario: "timeout"`, wait ~6 s              | `unknown` first, then `succeeded`/`failed`                               |
-| 6   | Transient retry     | `simulator_scenario: "transient"`                       | Two attempts; success on the second                                      |
-| 7   | Cancel a payment    | Create, then `POST /cancel` immediately                 | `canceled`; the queued job never runs                                    |
-| 8   | Partial refund      | Approve a payment, refund ₹50                           | `partially_refunded`; `refundable_minor` drops; a second journal appears |
-| 9   | Over-refund         | Refund more than `refundable_minor`                     | `409 refund_exceeds_remaining`                                           |
-| 10  | Full refund         | Refund without `amount_minor`                           | `refunded`; the payment leaves the refundable set                        |
-| 11  | Cancel a refund     | Reserve a refund, then `POST /v1/refunds/{id}/cancel`   | `canceled`; the reservation returns to the payment                       |
-| 12  | Trial balance       | `GET /v1/accounts`                                      | `balanced: true`; debits equal credits                                   |
-| 13  | Immutability        | `update ledger_entries set amount_minor = …`            | `ledger entries are immutable`                                           |
-| 14  | Tenant isolation    | Fetch a payment with another merchant's key             | `404`                                                                    |
-| 15  | Pagination          | `GET /v1/payments?limit=2`, follow `next_cursor`        | Stable pages; no duplicates while new rows arrive                        |
-| 16  | Config drift        | `PAYFLOW_DEFAULT_PAGE_SIZE=5 npm run dev:api`           | The list endpoint returns 5 rows by default                              |
-| 17  | Worker split        | `PAYFLOW_WORKER_ENABLED=false`, then create a payment   | It stays `created` until the standalone worker starts                    |
-| 18  | Lease recovery      | Kill the worker mid-flight, wait out the lease          | The job is re-claimed and the payment still settles once                 |
+| #   | Lab                  | Do this                                                 | Observe                                                                  |
+| --- | -------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | Idempotent replay    | `POST /v1/payments` twice, same key and body            | Same `id`; second response has `Idempotency-Replayed: true`              |
+| 2   | Key misuse           | Same key, different amount                              | `409 idempotency_key_reused`                                             |
+| 3   | Approve              | `simulator_scenario: "approve"`, then `GET` the payment | `succeeded`, 3 events, 1 attempt, 1 journal                              |
+| 4   | Decline              | `simulator_scenario: "decline"`                         | `failed`, `card_declined`, **no** journal                                |
+| 5   | Timeout → reconcile  | `simulator_scenario: "timeout"`, wait ~6 s              | `unknown` first, then `succeeded`/`failed`                               |
+| 6   | Transient retry      | `simulator_scenario: "transient"`                       | Two attempts; success on the second                                      |
+| 7   | Cancel a payment     | Create, then `POST /cancel` immediately                 | `canceled`; the queued job never runs                                    |
+| 8   | Partial refund       | Approve a payment, refund ₹50                           | `partially_refunded`; `refundable_minor` drops; a second journal appears |
+| 9   | Over-refund          | Refund more than `refundable_minor`                     | `409 refund_exceeds_remaining`                                           |
+| 10  | Full refund          | Refund without `amount_minor`                           | `refunded`; the payment leaves the refundable set                        |
+| 11  | Cancel a refund      | Reserve a refund, then `POST /v1/refunds/{id}/cancel`   | `canceled`; the reservation returns to the payment                       |
+| 12  | Trial balance        | `GET /v1/accounts`                                      | `balanced: true`; debits equal credits                                   |
+| 13  | Immutability         | `update ledger_entries set amount_minor = …`            | `ledger entries are immutable`                                           |
+| 14  | Tenant isolation     | Fetch a payment with another merchant's key             | `404`                                                                    |
+| 15  | Pagination           | `GET /v1/payments?limit=2`, follow `next_cursor`        | Stable pages; no duplicates while new rows arrive                        |
+| 16  | Config drift         | `PAYFLOW_DEFAULT_PAGE_SIZE=5 npm run dev:api`           | The list endpoint returns 5 rows by default                              |
+| 17  | Worker split         | `PAYFLOW_WORKER_ENABLED=false`, then create a payment   | It stays `created` until the standalone worker starts                    |
+| 18  | Lease recovery       | Kill the worker mid-flight, wait out the lease          | The job is re-claimed and the payment still settles once                 |
+| 19  | Instrument lifecycle | Create a card, attach it, disable it                    | A disabled method yields `409 payment_method_not_active`                 |
+| 20  | Webhook delivery     | Use the seeded sink, create a payment                   | The sink records a signed payload; `GET /_sink/demo` shows it            |
+| 21  | Failing endpoint     | Point an endpoint at a closed port                      | The event goes to `failed`, the job to `retrying`                        |
+| 22  | Payout guard         | Request more than the payable balance                   | `409 insufficient_balance`; the books do not move                        |
+| 23  | Payout settlement    | Pay out a settled balance                               | Payable and clearing both fall; the books stay balanced                  |
+| 24  | Lost dispute         | Open a dispute and resolve it as lost                   | The merchant payable is reduced by the disputed amount                   |
+| 25  | Key revocation       | Issue a key, revoke it, call the API                    | The revoked key returns `401` immediately                                |
 
 ---
 
 # Part VII — What we gave up
 
-| We chose                        | Instead of              | Cost we accept                                     |
-| ------------------------------- | ----------------------- | -------------------------------------------------- |
-| SQLite                          | Postgres                | Single writer; no `SKIP LOCKED`; untested at scale |
-| Polling                         | WebSockets              | Up to 5 s of lag on aggregates                     |
-| A jobs table                    | A broker                | Throughput is bounded by SQLite writes             |
-| Derived balances                | Stored balances         | Slightly more query work per read                  |
-| An in-process worker by default | A separate service      | One process to scale horizontally                  |
-| Immutable journals              | Mutable rows            | Corrections need compensating entries              |
-| Bearer keys                     | User accounts           | No password reset, no 2FA, no sessions             |
-| Simulator controls in dev       | A sandbox service       | Production must disable them explicitly            |
-| Zod runtime contracts           | Hand-written validation | One schema, two consumers (OpenAPI + types)        |
+| We chose                        | Instead of              | Cost we accept                                         |
+| ------------------------------- | ----------------------- | ------------------------------------------------------ |
+| SQLite                          | Postgres                | Single writer; no `SKIP LOCKED`; untested at scale     |
+| Polling                         | WebSockets              | Up to 5 s of lag on aggregates                         |
+| A jobs table                    | A broker                | Throughput is bounded by SQLite writes                 |
+| Derived balances                | Stored balances         | Slightly more query work per read                      |
+| An in-process worker by default | A separate service      | One process to scale horizontally                      |
+| Immutable journals              | Mutable rows            | Corrections need compensating entries                  |
+| Bearer keys                     | User accounts           | No password reset, no 2FA, no sessions                 |
+| Simulator controls in dev       | A sandbox service       | Production must disable them explicitly                |
+| Zod runtime contracts           | Hand-written validation | One schema, two consumers (OpenAPI + types)            |
+| Tokenized instruments           | Storing card data       | No secret is stored, so there is nothing to breach     |
+| Signed webhook payloads         | Unsigned callbacks      | A receiver can prove authenticity and reject replays   |
+| Balance-bounded payouts         | Unrestricted transfers  | A payout can never move uncollected money              |
+| Disputes as an overlay          | Disputes as statuses    | The charge stays settled; the claim is a separate fact |
 
 ---
 
@@ -938,6 +1190,13 @@ Each lab takes two minutes and produces an observation you can defend.
 | `ledger_transactions` | Journal headers            | Unique `(source_type, source_id)`                   |
 | `ledger_entries`      | Journal lines              | Positive amounts; immutable                         |
 | `refunds`             | Refund state               | `amount_minor > 0`; references payment and merchant |
+| `payment_methods`     | Tokenized instruments      | Type limited to card/upi/bank/wallet                |
+| `webhook_endpoints`   | Delivery targets, secrets  | One row per merchant endpoint                       |
+| `webhook_events`      | Transactional outbox       | Status, attempts, next attempt time                 |
+| `webhook_deliveries`  | Per-endpoint attempts      | One row per attempt                                 |
+| `payouts`             | Money out of payable       | Status, destination, failure code                   |
+| `disputes`            | Chargeback overlay         | Status limited to open/won/lost                     |
+| `dev_sink`            | Development sink           | Records received payloads                           |
 
 ```text
 merchants 1 ──< api_keys
@@ -956,26 +1215,31 @@ changes require the database to be rebuilt.
 
 ## 8.2 Glossary
 
-| Term                    | Meaning here                                                                       |
-| ----------------------- | ---------------------------------------------------------------------------------- |
-| **Processor reference** | The id the “processor” returns for one attempt (`proc_…`); the key to `lookup()`   |
-| **Attempt**             | One call to the processor, recorded in `payment_attempts`                          |
-| **Event**               | One state change, recorded in `payment_events`                                     |
-| **Job**                 | A durable unit of work in the `jobs` table                                         |
-| **Lease**               | Time-limited ownership of a job; expires so a dead worker cannot block it          |
-| **Dead letter**         | A job that exhausted its retries (`status = 'dead'`)                               |
-| **Reconciliation**      | Resolving an `unknown` outcome with `lookup()`                                     |
-| **Reservation**         | Refund capacity held but not yet settled                                           |
-| **Journal**             | A balanced set of debit/credit lines for one event                                 |
-| **Entry**               | One line of a journal                                                              |
-| **Trial balance**       | Total debits vs total credits for a merchant                                       |
-| **Minor unit**          | The smallest currency unit (paise)                                                 |
-| **Keyset cursor**       | Opaque “last seen row” token for stable pagination                                 |
-| **Fingerprint**         | `sha256` of the meaningful request fields; detects key reuse with a different body |
-| **Pepper**              | Server-side secret mixed into API-key hashes                                       |
-| **Scenario**            | Forced simulator outcome for a request                                             |
-| **Replay**              | Returning a stored response instead of re-running the work                         |
-| **At-least-once**       | The delivery guarantee; paired with idempotent handlers                            |
+| Term                     | Meaning here                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| **Processor reference**  | The id the “processor” returns for one attempt (`proc_…`); the key to `lookup()`   |
+| **Attempt**              | One call to the processor, recorded in `payment_attempts`                          |
+| **Event**                | One state change, recorded in `payment_events`                                     |
+| **Job**                  | A durable unit of work in the `jobs` table                                         |
+| **Lease**                | Time-limited ownership of a job; expires so a dead worker cannot block it          |
+| **Dead letter**          | A job that exhausted its retries (`status = 'dead'`)                               |
+| **Reconciliation**       | Resolving an `unknown` outcome with `lookup()`                                     |
+| **Reservation**          | Refund capacity held but not yet settled                                           |
+| **Journal**              | A balanced set of debit/credit lines for one event                                 |
+| **Entry**                | One line of a journal                                                              |
+| **Trial balance**        | Total debits vs total credits for a merchant                                       |
+| **Minor unit**           | The smallest currency unit (paise)                                                 |
+| **Keyset cursor**        | Opaque “last seen row” token for stable pagination                                 |
+| **Fingerprint**          | `sha256` of the meaningful request fields; detects key reuse with a different body |
+| **Pepper**               | Server-side secret mixed into API-key hashes                                       |
+| **Scenario**             | Forced simulator outcome for a request                                             |
+| **Replay**               | Returning a stored response instead of re-running the work                         |
+| **At-least-once**        | The delivery guarantee; paired with idempotent handlers                            |
+| **Outbox**               | Table of pending events written with the business change                           |
+| **Signing secret**       | Shared secret used to HMAC-sign a delivery payload                                 |
+| **Tokenized instrument** | A stored reference to a payment method; no PAN is kept                             |
+| **Payout**               | A transfer of collected funds out of the merchant payable balance                  |
+| **Dispute**              | A chargeback claim against a settled payment, resolved won or lost                 |
 
 ## 8.3 Reading list
 

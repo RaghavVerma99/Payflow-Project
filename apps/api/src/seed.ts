@@ -1,20 +1,27 @@
 import { writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { loadConfig, repoRoot } from "./config";
 import { createDb, type Db } from "./db";
-import { newId } from "./domain";
+import { newId, nowIso } from "./domain";
 import {
+  disputes,
   merchants,
   paymentAttempts,
   paymentEvents,
+  paymentMethods,
   payments,
+  payouts,
   refunds,
+  webhookEndpoints,
 } from "./schema";
 import { createApiKeyForMerchant, createMerchant } from "./services/auth";
 import { enqueue } from "./services/jobs";
 import {
+  accountBalance,
   paymentJournalLines,
+  payoutJournalLines,
   postJournal,
   refundJournalLines,
 } from "./services/ledger";
@@ -279,6 +286,172 @@ function insertEvent(
     .run();
 }
 
+function seedPlatform(
+  db: Db,
+  merchantId: string,
+): { methods: number; endpoints: number; disputes: number; payouts: number } {
+  const existingMethods = db
+    .select({ id: paymentMethods.id })
+    .from(paymentMethods)
+    .where(eq(paymentMethods.merchantId, merchantId))
+    .limit(1)
+    .get();
+
+  if (existingMethods)
+    return { methods: 0, endpoints: 0, disputes: 0, payouts: 0 };
+
+  const methodSpecs = [
+    {
+      type: "card" as const,
+      label: "Acme corporate card",
+      last4: "4242",
+      network: "visa",
+      expiryMonth: 11,
+      expiryYear: 2030,
+    },
+    {
+      type: "card" as const,
+      label: "Acme backup card",
+      last4: "8210",
+      network: "mastercard",
+      expiryMonth: 4,
+      expiryYear: 2029,
+    },
+    {
+      type: "upi" as const,
+      label: "acme@payflow",
+      last4: null,
+      network: null,
+      expiryMonth: null,
+      expiryYear: null,
+    },
+    {
+      type: "bank" as const,
+      label: "HDFC current account",
+      last4: "7788",
+      network: "netbanking",
+      expiryMonth: null,
+      expiryYear: null,
+    },
+    {
+      type: "wallet" as const,
+      label: "Acme wallet",
+      last4: null,
+      network: null,
+      expiryMonth: null,
+      expiryYear: null,
+    },
+  ];
+
+  let disputeCount = 0;
+  let payoutCount = 0;
+
+  db.transaction(
+    (tx) => {
+      const t = tx as unknown as Db;
+
+      for (const spec of methodSpecs) {
+        t.insert(paymentMethods)
+          .values({
+            id: newId("pm"),
+            merchantId,
+            type: spec.type,
+            label: spec.label,
+            last4: spec.last4,
+            network: spec.network,
+            expiryMonth: spec.expiryMonth,
+            expiryYear: spec.expiryYear,
+            status: "active",
+            createdAt: nowIso(),
+          })
+          .run();
+      }
+
+      t.insert(webhookEndpoints)
+        .values({
+          id: newId("whe"),
+          merchantId,
+          url: "http://127.0.0.1:4000/_sink/demo",
+          secret: `whsec_${randomBytes(24).toString("base64url")}`,
+          description: "Development sink",
+          status: "active",
+          createdAt: nowIso(),
+        })
+        .run();
+
+      const settled = t
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.merchantId, merchantId),
+            eq(payments.status, "succeeded"),
+          ),
+        )
+        .limit(1)
+        .get();
+
+      if (settled && settled.status === "succeeded") {
+        t.insert(disputes)
+          .values({
+            id: newId("dp"),
+            paymentId: settled.id,
+            merchantId,
+            amountMinor: Math.max(100, Math.floor(settled.amountMinor * 0.2)),
+            reason: "Customer claims the order never arrived",
+            status: "open",
+            note: "Awaiting carrier evidence",
+            createdAt: new Date(Date.now() - 6 * 3_600_000).toISOString(),
+            resolvedAt: null,
+          })
+          .run();
+        disputeCount = 1;
+      }
+
+      const available = accountBalance(t, merchantId, "merchant_payable");
+      const payoutAmount = 25_000;
+
+      if (available >= payoutAmount) {
+        const payoutId = newId("po");
+        const paidAt = new Date(Date.now() - 90 * 60_000).toISOString();
+
+        t.insert(payouts)
+          .values({
+            id: payoutId,
+            merchantId,
+            amountMinor: payoutAmount,
+            currency: "INR",
+            destination: "bank://hdfc-7788",
+            status: "paid",
+            failureCode: null,
+            processorReference: newId("proc"),
+            createdAt: paidAt,
+            updatedAt: paidAt,
+          })
+          .run();
+
+        postJournal(t, {
+          merchantId,
+          sourceType: "payout",
+          sourceId: payoutId,
+          lines: payoutJournalLines(payoutAmount),
+          createdAt: paidAt,
+        });
+
+        payoutCount = 1;
+      }
+    },
+    { behavior: "immediate" },
+  );
+
+  return {
+    methods: methodSpecs.length,
+    endpoints: 1,
+    disputes: disputeCount,
+    payouts: payoutCount,
+  };
+}
+
 function main(): void {
   const config = loadConfig({ workerEnabled: false });
   const handle = createDb(config.dbPath);
@@ -334,6 +507,7 @@ function main(): void {
     }
 
     const demo = seedDemo(db, acmeId, config.maxJobAttempts);
+    const platform = seedPlatform(db, acmeId);
 
     for (const credential of credentials) {
       credential.seeded = credential.merchant_id === acmeId;
@@ -358,6 +532,7 @@ function main(): void {
           demo_key_file: keyFile,
           merchants: credentials,
           demo,
+          platform,
           note: "Store the API key now. Only a hash is kept in the database. Re-run seed for a fresh key.",
         },
         null,

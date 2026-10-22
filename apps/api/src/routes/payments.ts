@@ -80,6 +80,7 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
         currency: body.currency,
         customerId: body.customer_id ?? null,
         description: body.description ?? null,
+        paymentMethodId: body.payment_method_id ?? null,
         scenario,
         idempotencyKey: idempotencyKeyFrom(request.headers),
         idempotencyTtlHours: app.config.idempotencyTtlHours,

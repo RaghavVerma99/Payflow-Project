@@ -29,13 +29,19 @@ function assertInstrument(input: CreatePaymentMethodInput): void {
         "invalid_payment_method",
       );
     }
-    if (input.expiryMonth && (input.expiryMonth < 1 || input.expiryMonth > 12)) {
+    if (
+      input.expiryMonth &&
+      (input.expiryMonth < 1 || input.expiryMonth > 12)
+    ) {
       throw errors.invalid(
         "expiry_month must be between 1 and 12.",
         "invalid_payment_method",
       );
     }
-    if (input.expiryYear && (input.expiryYear < 2000 || input.expiryYear > 2100)) {
+    if (
+      input.expiryYear &&
+      (input.expiryYear < 2000 || input.expiryYear > 2100)
+    ) {
       throw errors.invalid(
         "expiry_year must be a four digit year.",
         "invalid_payment_method",
@@ -115,6 +121,7 @@ export function listPaymentMethods(
   merchantId: string,
   limit: number,
   cursor?: string | null,
+  status?: string | null,
 ): Page<PaymentMethodRow> {
   const anchor = cursor ? decodeCursor(cursor) : null;
 
@@ -124,6 +131,7 @@ export function listPaymentMethods(
     .where(
       and(
         eq(paymentMethods.merchantId, merchantId),
+        status ? eq(paymentMethods.status, status) : undefined,
         anchor
           ? or(
               lt(paymentMethods.createdAt, anchor.createdAt),

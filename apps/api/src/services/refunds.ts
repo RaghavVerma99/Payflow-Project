@@ -5,6 +5,7 @@ import {
   decodeCursor,
   encodeCursor,
   errors,
+  formatMinor,
   newId,
   nowIso,
   parseScenario,
@@ -15,6 +16,7 @@ import { cancelPendingJobs, enqueue } from "./jobs";
 import { withIdempotency } from "./idempotency";
 import { addPaymentEvent, getPayment } from "./payments";
 import { serializeRefund, type RefundView } from "./serializers";
+import { emitWebhookEvent } from "./webhooks";
 
 export function refundableMinor(payment: PaymentRow): number {
   return Math.max(
@@ -213,6 +215,14 @@ export function cancelRefund(
         payment.status,
         `Refund ${refund.id} canceled; reservation released.`,
       );
+
+      emitWebhookEvent(t, payment.merchantId, "refund.canceled", {
+        id: refund.id,
+        payment_id: payment.id,
+        amount_minor: refund.amountMinor,
+        amount: formatMinor(refund.amountMinor),
+        status: "canceled",
+      });
 
       return t
         .select()

@@ -10,7 +10,14 @@ import type {
   WebhookEndpointRow,
   WebhookEventRow,
 } from "../schema";
-import { formatMinor, type PaymentStatus, type RefundStatus } from "../domain";
+import {
+  formatMinor,
+  type DisputeStatus,
+  type PaymentMethodType,
+  type PaymentStatus,
+  type PayoutStatus,
+  type RefundStatus,
+} from "../domain";
 
 export function serializePayment(payment: PaymentRow) {
   return {
@@ -82,7 +89,7 @@ export function serializePaymentMethod(method: PaymentMethodRow) {
   return {
     object: "payment_method" as const,
     id: method.id,
-    type: method.type,
+    type: method.type as PaymentMethodType,
     label: method.label,
     last4: method.last4,
     network: method.network,
@@ -97,7 +104,7 @@ export function serializePayout(payout: PayoutRow) {
   return {
     object: "payout" as const,
     id: payout.id,
-    status: payout.status,
+    status: payout.status as PayoutStatus,
     amount_minor: payout.amountMinor,
     amount: formatMinor(payout.amountMinor),
     currency: payout.currency,
@@ -113,7 +120,7 @@ export function serializeDispute(dispute: DisputeRow) {
     object: "dispute" as const,
     id: dispute.id,
     payment_id: dispute.paymentId,
-    status: dispute.status,
+    status: dispute.status as DisputeStatus,
     amount_minor: dispute.amountMinor,
     amount: formatMinor(dispute.amountMinor),
     reason: dispute.reason,

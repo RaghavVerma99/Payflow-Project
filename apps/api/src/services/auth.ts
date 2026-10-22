@@ -86,6 +86,7 @@ export function resolveApiKey(
   const row = db
     .select({
       keyHash: apiKeys.keyHash,
+      keyId: apiKeys.id,
       merchantId: merchants.id,
       merchantName: merchants.name,
       merchantStatus: merchants.status,
@@ -103,10 +104,11 @@ export function resolveApiKey(
     return null;
   }
 
-  return { id: row.merchantId, name: row.merchantName };
+  return { id: row.merchantId, name: row.merchantName, keyId: row.keyId };
 }
 
 export interface MerchantContextRow {
   id: string;
   name: string;
+  keyId: string;
 }

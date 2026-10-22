@@ -1,10 +1,13 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { apiKeys } from "../schema";
 import { errors, newId, nowIso } from "../domain";
 import { generateApiKey } from "./auth";
 
+const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
+
 export interface ApiKeyView {
+  object: "api_key";
   id: string;
   prefix: string;
   name: string | null;
@@ -23,6 +26,7 @@ export function listApiKeys(db: Db, merchantId: string): ApiKeyView[] {
     .all();
 
   return rows.map((row) => ({
+    object: "api_key" as const,
     id: row.id,
     prefix: row.keyPrefix,
     name: row.name,
@@ -56,6 +60,7 @@ export function createApiKey(
 
   return {
     key: {
+      object: "api_key" as const,
       id,
       prefix: generated.keyPrefix,
       name: name ?? null,
@@ -83,13 +88,11 @@ export function revokeApiKey(
 
   const revokedAt = key.revokedAt ?? nowIso();
   if (!key.revokedAt) {
-    db.update(apiKeys)
-      .set({ revokedAt })
-      .where(eq(apiKeys.id, key.id))
-      .run();
+    db.update(apiKeys).set({ revokedAt }).where(eq(apiKeys.id, key.id)).run();
   }
 
   return {
+    object: "api_key" as const,
     id: key.id,
     prefix: key.keyPrefix,
     name: key.name,
@@ -101,14 +104,22 @@ export function revokeApiKey(
 }
 
 export function touchApiKey(db: Db, keyId: string): void {
-  const now = nowIso();
+  const row = db
+    .select({ lastUsedAt: apiKeys.lastUsedAt })
+    .from(apiKeys)
+    .where(eq(apiKeys.id, keyId))
+    .get();
+
+  if (!row) return;
+  if (
+    row.lastUsedAt &&
+    Date.now() - Date.parse(row.lastUsedAt) < LAST_USED_THROTTLE_MS
+  ) {
+    return;
+  }
+
   db.update(apiKeys)
-    .set({ lastUsedAt: now })
-    .where(
-      and(
-        eq(apiKeys.id, keyId),
-        sql`(${apiKeys.lastUsedAt} is null or ${apiKeys.lastUsedAt} < ${now})`,
-      ),
-    )
+    .set({ lastUsedAt: nowIso() })
+    .where(eq(apiKeys.id, keyId))
     .run();
 }

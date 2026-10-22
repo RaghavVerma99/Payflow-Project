@@ -1,7 +1,136 @@
 import { z } from "zod";
-import { PAYMENT_STATUSES, REFUND_STATUSES, SCENARIOS } from "./domain";
+import {
+  DISPUTE_STATUSES,
+  PAYMENT_METHOD_TYPES,
+  PAYMENT_STATUSES,
+  PAYOUT_STATUSES,
+  REFUND_STATUSES,
+  SCENARIOS,
+} from "./domain";
 
 const ISODate = z.string();
+
+export const PaymentMethodSchema = z.object({
+  object: z.literal("payment_method"),
+  id: z.string(),
+  type: z.enum(PAYMENT_METHOD_TYPES),
+  label: z.string(),
+  last4: z.string().nullable(),
+  network: z.string().nullable(),
+  expiry_month: z.number().int().nullable(),
+  expiry_year: z.number().int().nullable(),
+  status: z.string(),
+  created_at: ISODate,
+});
+
+export const PayoutSchema = z.object({
+  object: z.literal("payout"),
+  id: z.string(),
+  status: z.enum(PAYOUT_STATUSES),
+  amount_minor: z.number().int(),
+  amount: z.string(),
+  currency: z.string(),
+  destination: z.string(),
+  failure_code: z.string().nullable(),
+  created_at: ISODate,
+  updated_at: ISODate,
+});
+
+export const DisputeSchema = z.object({
+  object: z.literal("dispute"),
+  id: z.string(),
+  payment_id: z.string(),
+  status: z.enum(DISPUTE_STATUSES),
+  amount_minor: z.number().int(),
+  amount: z.string(),
+  reason: z.string(),
+  note: z.string().nullable(),
+  created_at: ISODate,
+  resolved_at: z.string().nullable(),
+});
+
+export const WebhookEndpointSchema = z.object({
+  object: z.literal("webhook_endpoint"),
+  id: z.string(),
+  url: z.string(),
+  description: z.string().nullable(),
+  status: z.string(),
+  created_at: ISODate,
+});
+
+export const WebhookEventSchema = z.object({
+  object: z.literal("webhook_event"),
+  id: z.string(),
+  type: z.string(),
+  status: z.string(),
+  attempts: z.number().int(),
+  last_error: z.string().nullable(),
+  payload: z.unknown(),
+  created_at: ISODate,
+  updated_at: ISODate,
+});
+
+export const WebhookDeliverySchema = z.object({
+  object: z.literal("webhook_delivery"),
+  id: z.string(),
+  event_id: z.string(),
+  endpoint_id: z.string(),
+  attempt: z.number().int(),
+  status: z.string(),
+  response_status: z.number().int().nullable(),
+  response_body: z.string().nullable(),
+  error: z.string().nullable(),
+  created_at: ISODate,
+});
+
+export const ApiKeySchema = z.object({
+  object: z.literal("api_key"),
+  id: z.string(),
+  prefix: z.string(),
+  name: z.string().nullable(),
+  created_at: ISODate,
+  revoked_at: z.string().nullable(),
+  last_used_at: z.string().nullable(),
+  status: z.enum(["active", "revoked"]),
+});
+
+export const PaymentMethodListSchema = z.object({
+  data: z.array(PaymentMethodSchema),
+  has_more: z.boolean(),
+  next_cursor: z.string().nullable(),
+});
+
+export const PayoutListSchema = z.object({
+  data: z.array(PayoutSchema),
+  has_more: z.boolean(),
+  next_cursor: z.string().nullable(),
+});
+
+export const DisputeListSchema = z.object({
+  data: z.array(DisputeSchema),
+  has_more: z.boolean(),
+  next_cursor: z.string().nullable(),
+});
+
+export const WebhookEventListSchema = z.object({
+  data: z.array(WebhookEventSchema),
+  has_more: z.boolean(),
+  next_cursor: z.string().nullable(),
+});
+
+export const WebhookDeliveryListSchema = z.object({
+  data: z.array(WebhookDeliverySchema),
+  has_more: z.boolean(),
+  next_cursor: z.string().nullable(),
+});
+
+export const WebhookEndpointListSchema = z.object({
+  data: z.array(WebhookEndpointSchema),
+});
+
+export const ApiKeyListSchema = z.object({
+  data: z.array(ApiKeySchema),
+});
 
 export const PaymentSchema = z.object({
   object: z.literal("payment"),
@@ -12,6 +141,7 @@ export const PaymentSchema = z.object({
   currency: z.string(),
   customer_id: z.string().nullable(),
   description: z.string().nullable(),
+  payment_method_id: z.string().nullable(),
   failure_code: z.string().nullable(),
   refunded_minor: z.number().int(),
   refund_reserved_minor: z.number().int(),
@@ -186,7 +316,48 @@ export const CreatePaymentBody = z.object({
   currency: z.literal("INR").default("INR"),
   customer_id: z.string().min(1).max(120).nullish(),
   description: z.string().max(500).nullish(),
+  payment_method_id: z.string().min(1).max(120).nullish(),
   simulator_scenario: z.enum(SCENARIOS).optional(),
+});
+
+export const CreatePaymentMethodBody = z.object({
+  type: z.enum(PAYMENT_METHOD_TYPES),
+  label: z.string().min(1).max(80),
+  last4: z.string().max(4).nullish(),
+  network: z.string().max(40).nullish(),
+  expiry_month: z.number().int().min(1).max(12).nullish(),
+  expiry_year: z.number().int().min(2000).max(2100).nullish(),
+});
+
+export const CreatePayoutBody = z.object({
+  amount_minor: z
+    .number()
+    .int()
+    .positive()
+    .max(1_000_000_000, "amount_minor exceeds the simulator limit"),
+  destination: z.string().min(1).max(120),
+  simulator_scenario: z.enum(SCENARIOS).optional(),
+});
+
+export const CreateDisputeBody = z.object({
+  payment_id: z.string().min(1, "payment_id is required"),
+  amount_minor: z.number().int().positive().nullish(),
+  reason: z.string().min(1).max(200),
+  note: z.string().max(500).nullish(),
+});
+
+export const ResolveDisputeBody = z.object({
+  outcome: z.enum(["won", "lost"]),
+  note: z.string().max(500).nullish(),
+});
+
+export const CreateWebhookEndpointBody = z.object({
+  url: z.string().min(1).max(500),
+  description: z.string().max(200).nullish(),
+});
+
+export const CreateApiKeyBody = z.object({
+  name: z.string().min(1).max(80).nullish(),
 });
 
 export const CreateRefundBody = z.object({
@@ -201,6 +372,34 @@ export const ListPaymentsQuery = (defaultLimit: number, maxLimit: number) =>
     limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
     cursor: z.string().optional(),
     status: z.enum(PAYMENT_STATUSES).optional(),
+  });
+
+export const ListMethodQuery = (defaultLimit: number, maxLimit: number) =>
+  z.object({
+    limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
+    cursor: z.string().optional(),
+    status: z.enum(["active", "disabled"]).optional(),
+  });
+
+export const ListPayoutQuery = (defaultLimit: number, maxLimit: number) =>
+  z.object({
+    limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
+    cursor: z.string().optional(),
+    status: z.enum(PAYOUT_STATUSES).optional(),
+  });
+
+export const ListDisputeQuery = (defaultLimit: number, maxLimit: number) =>
+  z.object({
+    limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
+    cursor: z.string().optional(),
+    status: z.enum(DISPUTE_STATUSES).optional(),
+  });
+
+export const ListWebhookEventQuery = (defaultLimit: number, maxLimit: number) =>
+  z.object({
+    limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
+    cursor: z.string().optional(),
+    status: z.enum(["pending", "delivered", "failed", "dead"]).optional(),
   });
 
 export const ListRefundsQuery = (defaultLimit: number, maxLimit: number) =>
@@ -223,6 +422,20 @@ export const TimeseriesQuery = z.object({
 
 export const PaymentParams = z.object({ id: z.string().min(1) });
 export const RefundParams = z.object({ id: z.string().min(1) });
+export const PayoutParams = z.object({ id: z.string().min(1) });
+export const DisputeParams = z.object({ id: z.string().min(1) });
+export const MethodParams = z.object({ id: z.string().min(1) });
+export const EndpointParams = z.object({ id: z.string().min(1) });
+export const ApiKeyParams = z.object({ id: z.string().min(1) });
+
+export const ReportQuery = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+});
+
+export const SettlementQuery = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
+});
 
 export const DemoSessionSchema = z.object({
   api_key: z.string(),

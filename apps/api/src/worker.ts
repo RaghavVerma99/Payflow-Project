@@ -46,7 +46,6 @@ import {
   type PaymentRow,
   type PayoutRow,
   type RefundRow,
-  type WebhookEventRow,
 } from "./schema";
 
 export interface WorkerLogger {
@@ -97,7 +96,10 @@ export async function runOnce(ctx: WorkerContext): Promise<boolean> {
   return true;
 }
 
-export async function runDrain(ctx: WorkerContext, maxJobs = 50): Promise<number> {
+export async function runDrain(
+  ctx: WorkerContext,
+  maxJobs = 50,
+): Promise<number> {
   let processed = 0;
   while (processed < maxJobs && (await runOnce(ctx))) {
     processed += 1;
@@ -531,6 +533,14 @@ function settleRefund(
           payment.status,
           `Refund ${refund.id} failed; reservation released.`,
         );
+        emitWebhookEvent(t, payment.merchantId, "refund.failed", {
+          id: refund.id,
+          payment_id: refund.paymentId,
+          amount_minor: refund.amountMinor,
+          amount: formatMinor(refund.amountMinor),
+          status: "failed",
+          failure_code: result.failureCode,
+        });
         return false;
       }
 
@@ -591,6 +601,14 @@ function settleRefund(
         sourceType: "refund",
         sourceId: refund.id,
         lines: refundJournalLines(refund.amountMinor),
+      });
+
+      emitWebhookEvent(t, payment.merchantId, "refund.succeeded", {
+        id: refund.id,
+        payment_id: payment.id,
+        amount_minor: refund.amountMinor,
+        amount: formatMinor(refund.amountMinor),
+        status: "succeeded",
       });
 
       return false;
@@ -813,7 +831,10 @@ function reconcilePayout(ctx: WorkerContext, payoutId: string): void {
   );
 }
 
-async function deliverWebhook(ctx: WorkerContext, eventId: string): Promise<void> {
+async function deliverWebhook(
+  ctx: WorkerContext,
+  eventId: string,
+): Promise<void> {
   const event = ctx.db
     .select()
     .from(webhookEvents)

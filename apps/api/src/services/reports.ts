@@ -1,9 +1,28 @@
-import { and, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { disputes, payments, payouts, refunds } from "../schema";
-import { formatMinor } from "../domain";
+import { errors, formatMinor } from "../domain";
 
 const SUCCESSFUL = ["succeeded", "partially_refunded", "refunded"] as const;
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+export function normalizeWindow(
+  from: string,
+  to: string,
+): { from: string; to: string } {
+  const start = DATE_ONLY.test(from) ? `${from}T00:00:00.000Z` : from;
+  const end = DATE_ONLY.test(to) ? `${to}T23:59:59.999Z` : to;
+
+  if (Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
+    throw errors.invalid("from and to must be dates or ISO timestamps.");
+  }
+  if (Date.parse(start) > Date.parse(end)) {
+    throw errors.invalid("from must not be later than to.");
+  }
+
+  return { from: start, to: end };
+}
 
 export interface PaymentReportRow {
   id: string;

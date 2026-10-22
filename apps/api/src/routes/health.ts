@@ -6,8 +6,9 @@ import { repoRoot } from "../config";
 import { DemoSessionSchema, HealthSchema } from "../schemas";
 import { resolveApiKey } from "../services/auth";
 import { jobQueueDepth } from "../worker";
+import { API_VERSION } from "../version";
 
-const VERSION = "1.0.0";
+
 
 export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
@@ -25,7 +26,7 @@ export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
       return {
         status: "ok" as const,
         service: "payflow-api",
-        version: VERSION,
+        version: API_VERSION,
         environment: app.config.env,
         checks: {
           database: "ok" as const,

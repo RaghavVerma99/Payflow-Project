@@ -5,13 +5,24 @@ import {
   Clock3,
   Loader2,
   RotateCcw,
+  Skull,
   Undo2,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import type { PaymentStatus, RefundStatus } from "../lib/api";
+import type {
+  Dispute,
+  PaymentStatus,
+  Payout,
+  RefundStatus,
+  WebhookEvent,
+} from "../lib/api";
 import { cn, formatCurrency, shortId } from "../lib/utils";
 import { Badge } from "./ui";
+
+type PayoutStatus = Payout["status"];
+type DisputeStatus = Dispute["status"];
+type WebhookStatus = WebhookEvent["status"];
 
 type BadgeVariant =
   | "default"
@@ -64,19 +75,52 @@ const REFUND_STYLES: Record<RefundStatus, StatusStyle> = {
   unknown: { label: "Unknown", variant: "warning", icon: AlertTriangle },
 };
 
+const PAYOUT_STYLES: Record<PayoutStatus, StatusStyle> = {
+  pending: { label: "Pending", variant: "outline", icon: Clock3 },
+  processing: {
+    label: "Processing",
+    variant: "info",
+    icon: Loader2,
+    spin: true,
+  },
+  paid: { label: "Paid", variant: "success", icon: CheckCircle2 },
+  failed: { label: "Failed", variant: "danger", icon: XCircle },
+  unknown: { label: "Unknown", variant: "warning", icon: AlertTriangle },
+};
+
+const DISPUTE_STYLES: Record<DisputeStatus, StatusStyle> = {
+  open: { label: "Open", variant: "warning", icon: AlertTriangle },
+  won: { label: "Won", variant: "success", icon: CheckCircle2 },
+  lost: { label: "Lost", variant: "danger", icon: XCircle },
+};
+
+const WEBHOOK_STYLES: Record<WebhookStatus, StatusStyle> = {
+  pending: { label: "Pending", variant: "outline", icon: Clock3 },
+  delivered: { label: "Delivered", variant: "success", icon: CheckCircle2 },
+  failed: { label: "Failed", variant: "danger", icon: XCircle },
+  dead: { label: "Dead", variant: "danger", icon: Skull },
+};
+
+type StatusKind = "payment" | "refund" | "payout" | "dispute" | "webhook";
+
+const STYLE_MAPS: Record<StatusKind, Record<string, StatusStyle>> = {
+  payment: PAYMENT_STYLES,
+  refund: REFUND_STYLES,
+  payout: PAYOUT_STYLES,
+  dispute: DISPUTE_STYLES,
+  webhook: WEBHOOK_STYLES,
+};
+
 export function StatusBadge({
   status,
   kind = "payment",
   className,
 }: {
-  status: PaymentStatus | RefundStatus | string;
-  kind?: "payment" | "refund";
+  status: PaymentStatus | RefundStatus | PayoutStatus | DisputeStatus | string;
+  kind?: StatusKind;
   className?: string;
 }) {
-  const styles =
-    kind === "refund"
-      ? REFUND_STYLES[status as RefundStatus]
-      : PAYMENT_STYLES[status as PaymentStatus];
+  const styles = STYLE_MAPS[kind]?.[status];
 
   const fallback: StatusStyle = {
     label: status,

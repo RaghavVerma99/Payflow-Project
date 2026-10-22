@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from "node:crypto";
-import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import type { Db } from "../db";
 import {
   webhookDeliveries,
@@ -19,22 +19,6 @@ import {
   type WebhookEventType,
 } from "../domain";
 import { enqueue } from "./jobs";
-
-const ALLOWED_EVENTS = new Set<string>([
-  "payment.created",
-  "payment.succeeded",
-  "payment.failed",
-  "payment.canceled",
-  "payment.unknown",
-  "refund.succeeded",
-  "refund.failed",
-  "refund.canceled",
-  "payout.paid",
-  "payout.failed",
-  "dispute.opened",
-  "dispute.won",
-  "dispute.lost",
-]);
 
 export function emitWebhookEvent(
   tx: Db,
@@ -74,6 +58,7 @@ export function createEndpoint(
     merchantId: string;
     url: string;
     description?: string | null;
+    allowPrivateHosts?: boolean;
   },
 ): { endpoint: WebhookEndpointRow; secret: string } {
   let parsed: URL;
@@ -85,6 +70,12 @@ export function createEndpoint(
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw errors.invalidWebhookUrl("Webhook url must use http or https.");
+  }
+
+  if (input.allowPrivateHosts === false && isPrivateHost(parsed.hostname)) {
+    throw errors.invalidWebhookUrl(
+      "Webhook url must not target a private or loopback address.",
+    );
   }
 
   const secret = `whsec_${randomBytes(24).toString("base64url")}`;
@@ -100,6 +91,25 @@ export function createEndpoint(
 
   db.insert(webhookEndpoints).values(endpoint).run();
   return { endpoint, secret };
+}
+
+export function isPrivateHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  if (host === "::1" || host === "0:0:0:0:0:0:0:1") return true;
+
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!ipv4) return false;
+
+  const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+  if (a === 127) return true;
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+
+  return false;
 }
 
 export function getEndpoint(
@@ -229,23 +239,24 @@ export function listDeliveries(
   };
 }
 
-export function dueEvents(
+export function getEvent(
   db: Db,
-  now: string,
-  limit: number,
-): WebhookEventRow[] {
-  return db
+  merchantId: string,
+  eventId: string,
+): WebhookEventRow {
+  const event = db
     .select()
     .from(webhookEvents)
     .where(
       and(
-        inArray(webhookEvents.status, ["pending", "failed"]),
-        lt(webhookEvents.nextAttemptAt, now),
+        eq(webhookEvents.id, eventId),
+        eq(webhookEvents.merchantId, merchantId),
       ),
     )
-    .orderBy(webhookEvents.createdAt)
-    .limit(limit)
-    .all();
+    .get();
+
+  if (!event) throw errors.notFound("Webhook event");
+  return event;
 }
 
 export function signPayload(
@@ -345,8 +356,4 @@ export function recordDelivery(
 
   db.insert(webhookDeliveries).values(delivery).run();
   return delivery;
-}
-
-export function isKnownEventType(value: string): value is WebhookEventType {
-  return ALLOWED_EVENTS.has(value);
 }

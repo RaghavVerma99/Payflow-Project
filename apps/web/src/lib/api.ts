@@ -22,12 +22,135 @@ export interface Payment {
   currency: string;
   customer_id: string | null;
   description: string | null;
+  payment_method_id: string | null;
   failure_code: string | null;
   refunded_minor: number;
   refund_reserved_minor: number;
   refundable_minor: number;
   created_at: string;
   updated_at: string;
+}
+
+export type PaymentMethodType = "card" | "upi" | "bank" | "wallet";
+
+export interface PaymentMethod {
+  object: "payment_method";
+  id: string;
+  type: PaymentMethodType;
+  label: string;
+  last4: string | null;
+  network: string | null;
+  expiry_month: number | null;
+  expiry_year: number | null;
+  status: "active" | "disabled";
+  created_at: string;
+}
+
+export interface Payout {
+  object: "payout";
+  id: string;
+  status: "pending" | "processing" | "paid" | "failed" | "unknown";
+  amount_minor: number;
+  amount: string;
+  currency: string;
+  destination: string;
+  failure_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Dispute {
+  object: "dispute";
+  id: string;
+  payment_id: string;
+  status: "open" | "won" | "lost";
+  amount_minor: number;
+  amount: string;
+  reason: string;
+  note: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface WebhookEndpoint {
+  object: "webhook_endpoint";
+  id: string;
+  url: string;
+  description: string | null;
+  status: "active" | "disabled";
+  created_at: string;
+}
+
+export interface WebhookEvent {
+  object: "webhook_event";
+  id: string;
+  type: string;
+  status: "pending" | "delivered" | "failed" | "dead";
+  attempts: number;
+  last_error: string | null;
+  payload: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookDelivery {
+  object: "webhook_delivery";
+  id: string;
+  event_id: string;
+  endpoint_id: string;
+  attempt: number;
+  status: "delivered" | "failed";
+  response_status: number | null;
+  response_body: string | null;
+  error: string | null;
+  created_at: string;
+}
+
+export interface ApiKey {
+  object: "api_key";
+  id: string;
+  prefix: string;
+  name: string | null;
+  created_at: string;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  status: "active" | "revoked";
+}
+
+export interface PaymentReport {
+  from: string;
+  to: string;
+  payments: number;
+  succeeded: number;
+  failed: number;
+  gross_minor: number;
+  refunded_minor: number;
+  net_minor: number;
+  rows: {
+    id: string;
+    created_at: string;
+    status: string;
+    amount_minor: number;
+    amount: string;
+    currency: string;
+    customer_id: string | null;
+    description: string | null;
+    refunded_minor: number;
+    failure_code: string | null;
+  }[];
+}
+
+export interface SettlementReport {
+  date: string;
+  captured_minor: number;
+  refunded_minor: number;
+  dispute_loss_minor: number;
+  paid_out_minor: number;
+  net_minor: number;
+  payments: number;
+  refunds: number;
+  disputes: number;
+  payouts: number;
 }
 
 export interface PaymentAttempt {
@@ -340,6 +463,123 @@ export const api = {
         cursor: params.cursor,
       })}`,
     ),
+
+  paymentMethods: (params?: { limit?: number; cursor?: string | null }) =>
+    request<Page<PaymentMethod>>(
+      `/v1/payment_methods${queryString({
+        limit: params?.limit,
+        cursor: params?.cursor,
+      })}`,
+    ),
+  createPaymentMethod: (input: {
+    type: PaymentMethodType;
+    label: string;
+    last4?: string | null;
+    network?: string | null;
+    expiry_month?: number | null;
+    expiry_year?: number | null;
+  }) =>
+    request<PaymentMethod>("/v1/payment_methods", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  disablePaymentMethod: (id: string) =>
+    request<PaymentMethod>(`/v1/payment_methods/${id}/disable`, {
+      method: "POST",
+    }),
+
+  payouts: (params?: {
+    limit?: number;
+    cursor?: string | null;
+    status?: string | null;
+  }) =>
+    request<Page<Payout>>(
+      `/v1/payouts${queryString({
+        limit: params?.limit,
+        cursor: params?.cursor,
+        status: params?.status,
+      })}`,
+    ),
+  createPayout: (input: {
+    amount_minor: number;
+    destination: string;
+    simulator_scenario?: Scenario;
+  }) =>
+    request<Payout>("/v1/payouts", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  disputes: (params?: {
+    limit?: number;
+    cursor?: string | null;
+    status?: string | null;
+  }) =>
+    request<Page<Dispute>>(
+      `/v1/disputes${queryString({
+        limit: params?.limit,
+        cursor: params?.cursor,
+        status: params?.status,
+      })}`,
+    ),
+  createDispute: (input: {
+    payment_id: string;
+    amount_minor?: number | null;
+    reason: string;
+    note?: string | null;
+  }) =>
+    request<Dispute>("/v1/disputes", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  resolveDispute: (id: string, outcome: "won" | "lost", note?: string | null) =>
+    request<Dispute>(`/v1/disputes/${id}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ outcome, note }),
+    }),
+
+  webhookEndpoints: () =>
+    request<{ data: WebhookEndpoint[] }>("/v1/webhook_endpoints"),
+  createWebhookEndpoint: (input: {
+    url: string;
+    description?: string | null;
+  }) =>
+    request<WebhookEndpoint & { secret: string }>("/v1/webhook_endpoints", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  disableWebhookEndpoint: (id: string) =>
+    request<WebhookEndpoint>(`/v1/webhook_endpoints/${id}/disable`, {
+      method: "POST",
+    }),
+  webhookEvents: (params?: { limit?: number; cursor?: string | null }) =>
+    request<Page<WebhookEvent>>(
+      `/v1/webhook_events${queryString({
+        limit: params?.limit,
+        cursor: params?.cursor,
+      })}`,
+    ),
+  webhookDeliveries: (params?: { limit?: number; cursor?: string | null }) =>
+    request<Page<WebhookDelivery>>(
+      `/v1/webhook_deliveries${queryString({
+        limit: params?.limit,
+        cursor: params?.cursor,
+      })}`,
+    ),
+
+  apiKeys: () => request<{ data: ApiKey[] }>("/v1/api_keys"),
+  createApiKey: (name?: string | null) =>
+    request<ApiKey & { secret: string }>("/v1/api_keys", {
+      method: "POST",
+      body: JSON.stringify({ name: name ?? null }),
+    }),
+  revokeApiKey: (id: string) =>
+    request<ApiKey>(`/v1/api_keys/${id}/revoke`, { method: "POST" }),
+
+  paymentReport: (from: string, to: string) =>
+    request<PaymentReport>(`/v1/reports/payments${queryString({ from, to })}`),
+  settlementReport: (date: string) =>
+    request<SettlementReport>(`/v1/reports/settlement${queryString({ date })}`),
 };
 
 export async function rawRequest(input: {

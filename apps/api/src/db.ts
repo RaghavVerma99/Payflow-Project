@@ -64,10 +64,7 @@ function migrateRefundStatus(sqlite: Database.Database): void {
   }
 }
 
-function tableColumns(
-  sqlite: Database.Database,
-  table: string,
-): string[] {
+function tableColumns(sqlite: Database.Database, table: string): string[] {
   return (
     sqlite.prepare(`pragma table_info(${table})`).all() as {
       name: string;

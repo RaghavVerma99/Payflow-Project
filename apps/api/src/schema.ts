@@ -218,7 +218,6 @@ export type PaymentAttemptRow = typeof paymentAttempts.$inferSelect;
 export type PaymentEventRow = typeof paymentEvents.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
-export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
 export type RefundRow = typeof refunds.$inferSelect;
 export type IdempotencyRow = typeof idempotencyRecords.$inferSelect;
 export type PaymentMethodRow = typeof paymentMethods.$inferSelect;

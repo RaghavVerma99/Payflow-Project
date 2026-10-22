@@ -19,11 +19,6 @@ export const ACCOUNT_SPECS = [
     name: "Processor clearing",
     kind: "asset" as const,
   },
-  {
-    code: "merchant_bank",
-    name: "Merchant bank",
-    kind: "asset" as const,
-  },
 ];
 
 export type Direction = "debit" | "credit";
@@ -98,7 +93,7 @@ export function refundJournalLines(amountMinor: number): JournalLine[] {
 export function payoutJournalLines(amountMinor: number): JournalLine[] {
   return [
     { code: "merchant_payable", direction: "debit", amountMinor },
-    { code: "merchant_bank", direction: "credit", amountMinor },
+    { code: "processor_clearing", direction: "credit", amountMinor },
   ];
 }
 
