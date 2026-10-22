@@ -157,11 +157,11 @@ export const metaRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getCapabilities",
         tags: ["System"],
         summary: "Deployment capabilities",
         description:
           "A machine-readable description of this deployment: available resources, simulator scenarios, webhook event types, error codes, and limits. Point an SDK generator or a client bootstrapper at this document.",
-        operationId: "getCapabilities",
         response: { 200: CapabilitiesSchema },
       },
     },
@@ -183,7 +183,8 @@ export const metaRoutes: FastifyPluginAsyncZod = async (app) => {
         webhooks: {
           event_types: [...WEBHOOK_EVENT_TYPES],
           signature_header: "x-payflow-signature",
-          signature_scheme: "t=<unix-seconds>,v1=hmac_sha256(secret, `<timestamp>.<body>`)",
+          signature_scheme:
+            "t=<unix-seconds>,v1=hmac_sha256(secret, `<timestamp>.<body>`)",
         },
         limits: {
           max_amount_minor: 1_000_000_000,

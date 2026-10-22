@@ -22,7 +22,9 @@ import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 import { cn } from "../lib/utils";
 import { AmbientCanvas } from "./ambient";
+import { CommandPalette } from "./command-palette";
 import { LiveClock } from "./motion";
+import { SystemStrip } from "./system-strip";
 import { Button } from "./ui";
 
 const NAV = [
@@ -374,7 +376,13 @@ export function AppShell() {
               API docs
             </a>
           </Button>
+
+          <kbd className="hidden items-center gap-1 rounded-lg border border-border bg-muted/30 px-2 py-1 font-mono text-[9px] text-muted-foreground/80 lg:inline-flex">
+            <span>⌘</span>K
+          </kbd>
         </header>
+
+        <SystemStrip />
 
         <main className="mx-auto w-full max-w-[1480px] px-4 py-7 sm:px-6 lg:px-9 lg:py-10">
           <div key={location.pathname} className="animate-page">
@@ -407,6 +415,8 @@ export function AppShell() {
           </div>
         </footer>
       </div>
+      <CommandPalette />
+
       <Toaster
         theme={theme}
         position="bottom-right"

@@ -22,6 +22,7 @@ export const platformRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "createApiKey",
         tags: ["Merchants"],
         summary: "Create an API key",
         description:
@@ -47,6 +48,7 @@ export const platformRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listApiKeys",
         tags: ["Merchants"],
         summary: "List API keys",
         response: { 200: ApiKeyListSchema },
@@ -62,6 +64,7 @@ export const platformRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "revokeApiKey",
         tags: ["Merchants"],
         summary: "Revoke an API key",
         description: "Revoked keys are rejected immediately.",
@@ -79,6 +82,7 @@ export const platformRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getPaymentReport",
         tags: ["Analytics"],
         summary: "Payment report",
         description:
@@ -116,6 +120,7 @@ export const platformRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getSettlementReport",
         tags: ["Analytics"],
         summary: "Settlement report for one day",
         querystring: SettlementQuery,

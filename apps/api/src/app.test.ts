@@ -700,6 +700,37 @@ describe("configuration", () => {
   });
 });
 
+describe("capabilities", () => {
+  it("describes the deployment for clients and generators", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1",
+      headers: auth(),
+    });
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json();
+    expect(body.object).toBe("capabilities");
+    expect(body.api_version).toBe("1.0.0");
+    expect(body.merchant.id).toBe(merchantId);
+    expect(body.resources.length).toBeGreaterThan(5);
+    expect(
+      body.resources.some((r: { name: string }) => r.name === "webhooks"),
+    ).toBe(true);
+    expect(body.simulator.scenarios).toContain("approve");
+    expect(body.simulator.outcome_distributions.card).toBeDefined();
+    expect(body.webhooks.event_types).toContain("payment.succeeded");
+    expect(body.limits.max_amount_minor).toBe(1_000_000_000);
+    expect(body.limits.default_page_size).toBe(25);
+    expect(body.error_codes).toContain("insufficient_balance");
+  });
+
+  it("requires authentication", async () => {
+    const response = await app.inject({ method: "GET", url: "/v1" });
+    expect(response.statusCode).toBe(401);
+  });
+});
+
 describe("payment methods", () => {
   it("creates, lists and disables a tokenized instrument", async () => {
     const created = await app.inject({

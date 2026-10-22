@@ -22,6 +22,7 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getMerchant",
         tags: ["Merchants"],
         summary: "Current merchant",
         response: { 200: MerchantSchema },
@@ -42,6 +43,7 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listAccounts",
         tags: ["Ledger"],
         summary: "Accounts and trial balance",
         response: { 200: AccountsResponseSchema },
@@ -60,6 +62,7 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listJournals",
         tags: ["Ledger"],
         summary: "List posted journals",
         querystring: ListJournalsQuery(
@@ -85,6 +88,7 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getOverview",
         tags: ["Analytics"],
         summary: "Dashboard overview",
         response: { 200: OverviewSchema },
@@ -100,6 +104,7 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getTimeseries",
         tags: ["Analytics"],
         summary: "Daily payment volume",
         querystring: TimeseriesQuery,

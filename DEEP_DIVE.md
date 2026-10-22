@@ -31,7 +31,7 @@ This document is the understanding.
 
 # Part I — The sixteen concepts
 
-PayFlow is sixteen ideas wearing a payment costume. Learn these and the codebase
+PayFlow is eighteen ideas wearing a payment costume. Learn these and the codebase
 becomes predictable.
 
 | #   | Concept                 | The claim                                                 | Where                           |
@@ -52,6 +52,8 @@ becomes predictable.
 | 14  | Signed payloads         | The receiver proves authenticity                          | `services/webhooks.ts`          |
 | 15  | Tokenized instruments   | No card number is ever stored                             | `services/payment-methods.ts`   |
 | 16  | Derived balance guards  | Payouts are bounded by what was actually collected        | `services/payouts.ts`           |
+| 17  | Capability documents    | A client should not have to guess what exists             | `routes/meta.ts`                |
+| 18  | Contract-first docs     | Every operation has a stable `operationId`                | `apps/api/src/routes/*`         |
 
 ---
 
@@ -601,6 +603,54 @@ when the refund reservation needed a conditional `UPDATE`? (Because
 `IMMEDIATE` takes the write lock at the start of the transaction, so no other
 writer can change the balance between the read and the write. A conditional
 `UPDATE` is still used where the invariant must also hold in the database.)
+
+---
+
+### 17. Capability documents
+
+**Concept.** A client should be able to discover what a deployment supports
+without reading prose. `GET /v1` returns the resource list, the simulator
+vocabularies, the webhook event types, the error codes, and the limits.
+
+```json
+{
+  "object": "capabilities",
+  "api_version": "1.0.0",
+  "resources": [
+    { "name": "webhooks", "endpoints": ["POST /v1/webhook_endpoints", "…"] }
+  ],
+  "simulator": {
+    "scenarios": ["approve", "decline", "timeout", "transient", "auto"]
+  },
+  "webhooks": { "event_types": ["payment.succeeded", "…"] },
+  "limits": { "max_amount_minor": 1000000000, "default_page_size": 25 },
+  "error_codes": ["insufficient_balance", "…"]
+}
+```
+
+**Why it matters.** The document is generated from the same constants the
+implementation uses — `SCENARIOS`, `PAYMENT_METHOD_TYPES`, `WEBHOOK_EVENT_TYPES`,
+`OUTCOME_DISTRIBUTIONS` — so it cannot drift from the code. A client bootstrapper
+or an SDK generator reads it once and knows the whole surface.
+
+### 18. Contract-first documentation
+
+**Concept.** An operation without a stable name is an operation a generated SDK
+cannot expose. Every route declares an `operationId`, and the OpenAPI document
+carries the tag taxonomy, the version, and the servers.
+
+```ts
+schema: {
+  tags: ["Payments"],
+  summary: "Create a payment",
+  operationId: "createPayment",
+  response: { 202: PaymentSchema },
+}
+```
+
+**Know it if you can answer:** what breaks in a generated SDK when two
+operations share an `operationId`? (One method overwrites the other, and the
+client silently calls the wrong endpoint.)
 
 ---
 

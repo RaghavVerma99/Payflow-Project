@@ -21,6 +21,7 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "createRefund",
         tags: ["Refunds"],
         summary: "Refund a succeeded payment",
         description:
@@ -59,6 +60,7 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listRefunds",
         tags: ["Refunds"],
         summary: "List refunds",
         querystring: ListRefundsQuery(
@@ -84,6 +86,7 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getRefund",
         tags: ["Refunds"],
         summary: "Get a refund",
         params: RefundParams,
@@ -102,6 +105,7 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "cancelRefund",
         tags: ["Refunds"],
         summary: "Cancel a reserved refund and release its capacity",
         params: RefundParams,

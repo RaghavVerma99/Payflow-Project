@@ -7,8 +7,10 @@ import {
   ExternalLink,
   GitBranch,
   KeyRound,
+  Landmark,
   Layers,
   Monitor,
+  Radio,
   RotateCcw,
   Scale,
   Server,
@@ -60,19 +62,43 @@ const INVARIANTS = [
     title: "Immutable ledger",
     body: "SQLite triggers reject UPDATE and DELETE on posted entries and posted transactions. Corrections require new journals.",
   },
+  {
+    icon: Radio,
+    title: "Transactional outbox",
+    body: "Events are written with the business change, then delivered. A delivery can never be lost, and never precedes the change it describes.",
+  },
+  {
+    icon: Landmark,
+    title: "Bounded payouts",
+    body: "A payout is checked against the merchant payable balance inside the transaction, so it can never move uncollected money.",
+  },
+  {
+    icon: Scale,
+    title: "Disputes stay separate",
+    body: "A dispute is an overlay on a settled charge. A lost claim posts a reversing journal; the charge itself remains settled.",
+  },
 ];
 
 const ENDPOINTS = [
+  ["GET", "/v1", "Deployment capabilities and limits"],
   ["POST", "/v1/payments", "Create a payment and enqueue processing"],
   ["GET", "/v1/payments", "Cursor-paginated list with status filter"],
   ["GET", "/v1/payments/:id", "Payment, attempts and event timeline"],
   ["POST", "/v1/payments/:id/cancel", "Cancel before the worker claims it"],
   ["POST", "/v1/refunds", "Reserve capacity and enqueue a refund"],
   ["GET", "/v1/refunds", "List refunds by status or payment"],
+  ["POST", "/v1/payment_methods", "Register a tokenized instrument"],
+  ["POST", "/v1/payouts", "Pay out collected funds"],
+  ["POST", "/v1/disputes", "Open a dispute on a settled payment"],
+  ["POST", "/v1/disputes/:id/resolve", "Resolve a dispute as won or lost"],
+  ["POST", "/v1/webhook_endpoints", "Register a delivery target and secret"],
+  ["GET", "/v1/webhook_events", "The transactional outbox"],
+  ["GET", "/v1/webhook_deliveries", "Every delivery attempt"],
   ["GET", "/v1/accounts", "Account balances and trial balance"],
   ["GET", "/v1/ledger/journals", "Posted double-entry journals"],
   ["GET", "/v1/stats/overview", "Dashboard aggregates"],
-  ["GET", "/v1/stats/timeseries", "Daily volume for charts"],
+  ["GET", "/v1/reports/payments", "Window report, JSON or CSV"],
+  ["GET", "/v1/reports/settlement", "One-day settlement summary"],
 ];
 
 const SCENARIOS = [

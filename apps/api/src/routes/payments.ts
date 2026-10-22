@@ -58,6 +58,7 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "createPayment",
         tags: ["Payments"],
         summary: "Create a payment",
         description:
@@ -98,6 +99,7 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listPayments",
         tags: ["Payments"],
         summary: "List payments",
         querystring: ListPaymentsQuery(
@@ -122,6 +124,7 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getPayment",
         tags: ["Payments"],
         summary: "Get a payment with attempts and events",
         params: PaymentParams,
@@ -138,6 +141,7 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "cancelPayment",
         tags: ["Payments"],
         summary: "Cancel a payment that has not been processed",
         params: PaymentParams,
@@ -159,6 +163,7 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listPaymentRefunds",
         tags: ["Refunds"],
         summary: "List refunds for a payment",
         params: PaymentParams,

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
+import { ControlRoom } from "../components/control-room";
 import { useAnimatedNumber, Reveal } from "../components/motion";
 import { NewPaymentDialog } from "../components/payment-dialog";
 import { PaymentDetailDialog } from "../components/payment-detail";
@@ -472,6 +473,10 @@ export function OverviewPage() {
           </>
         )}
       </div>
+
+      <Reveal>
+        <ControlRoom />
+      </Reveal>
 
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
         <Reveal className="xl:col-span-2">

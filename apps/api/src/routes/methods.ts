@@ -20,6 +20,7 @@ export const methodRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "createPaymentMethod",
         tags: ["Payment methods"],
         summary: "Create a tokenized payment method",
         description:
@@ -48,6 +49,7 @@ export const methodRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listPaymentMethods",
         tags: ["Payment methods"],
         summary: "List payment methods",
         querystring: ListMethodQuery(
@@ -79,6 +81,7 @@ export const methodRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getPaymentMethod",
         tags: ["Payment methods"],
         summary: "Get a payment method",
         params: MethodParams,
@@ -97,6 +100,7 @@ export const methodRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "disablePaymentMethod",
         tags: ["Payment methods"],
         summary: "Disable a payment method",
         description:

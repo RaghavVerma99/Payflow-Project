@@ -28,6 +28,7 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "createPayout",
         tags: ["Treasury"],
         summary: "Create a payout",
         description:
@@ -65,6 +66,7 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listPayouts",
         tags: ["Treasury"],
         summary: "List payouts",
         querystring: ListPayoutQuery(
@@ -94,6 +96,7 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getPayout",
         tags: ["Treasury"],
         summary: "Get a payout",
         params: PayoutParams,
@@ -112,6 +115,7 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "createDispute",
         tags: ["Treasury"],
         summary: "Open a dispute against a settled payment",
         body: CreateDisputeBody,
@@ -137,6 +141,7 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listDisputes",
         tags: ["Treasury"],
         summary: "List disputes",
         querystring: ListDisputeQuery(
@@ -166,6 +171,7 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getDispute",
         tags: ["Treasury"],
         summary: "Get a dispute",
         params: DisputeParams,
@@ -184,6 +190,7 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "resolveDispute",
         tags: ["Treasury"],
         summary: "Resolve a dispute",
         description:

@@ -8,13 +8,12 @@ import { resolveApiKey } from "../services/auth";
 import { jobQueueDepth } from "../worker";
 import { API_VERSION } from "../version";
 
-
-
 export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     "/health",
     {
       schema: {
+        operationId: "getHealth",
         tags: ["System"],
         summary: "Liveness and readiness",
         security: [],
@@ -43,6 +42,7 @@ export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
     "/v1/demo/session",
     {
       schema: {
+        operationId: "getDemoSession",
         tags: ["System"],
         summary: "Development demo credentials",
         description:

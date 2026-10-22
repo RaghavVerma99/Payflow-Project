@@ -42,6 +42,7 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "createWebhookEndpoint",
         tags: ["Webhooks"],
         summary: "Register a webhook endpoint",
         description:
@@ -71,6 +72,7 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listWebhookEndpoints",
         tags: ["Webhooks"],
         summary: "List webhook endpoints",
         response: { 200: WebhookEndpointListSchema },
@@ -90,6 +92,7 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "disableWebhookEndpoint",
         tags: ["Webhooks"],
         summary: "Disable a webhook endpoint",
         params: EndpointParams,
@@ -108,6 +111,7 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listWebhookEvents",
         tags: ["Webhooks"],
         summary: "List webhook events",
         querystring: ListWebhookEventQuery(
@@ -138,6 +142,7 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "getWebhookEvent",
         tags: ["Webhooks"],
         summary: "Get a webhook event",
         params: EndpointParams,
@@ -156,6 +161,7 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: "listWebhookDeliveries",
         tags: ["Webhooks"],
         summary: "List webhook delivery attempts",
         querystring: ListPaymentsQuery(
@@ -185,6 +191,7 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
       "/_sink/:token",
       {
         schema: {
+          operationId: "postSink",
           tags: ["System"],
           summary: "Development webhook sink",
           description:
@@ -219,6 +226,7 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
       "/_sink/:token",
       {
         schema: {
+          operationId: "getSink",
           tags: ["System"],
           summary: "Inspect received development deliveries",
           security: [],

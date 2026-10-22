@@ -9,7 +9,7 @@ console.
 | ----------------- | ------------------------------------------------------------------------------------------------------------- |
 | **Stack**         | TypeScript · Fastify 5 · Zod 4 · Drizzle ORM · SQLite (WAL) · React 19 · Vite 7 · Tailwind 4 · TanStack Query |
 | **Runtime**       | One Node process (API and worker), one SQLite file, no external services                                      |
-| **Tests**         | 42 API tests, CI-gated through `npm run verify`                                                               |
+| **Tests**         | 44 API tests, CI-gated through `npm run verify`                                                               |
 | **Documentation** | This file is the reference; [`DEEP_DIVE.md`](./DEEP_DIVE.md) explains the concepts behind it                  |
 
 > **Simulation only.** No card data is accepted, no processor is contacted, and no
@@ -263,10 +263,19 @@ failed refunds, and failed payouts post no journal.
 Base URL `http://localhost:4000`. Requests require
 `Authorization: Bearer sk_test_…`; writes require `Content-Type: application/json`.
 
+**Conventions.** Every operation carries a stable `operationId`, so generated
+SDKs expose named methods. Every response carries `x-request-id` and
+`x-payflow-api-version`; rate limit headers (`x-ratelimit-limit`,
+`x-ratelimit-remaining`, `x-ratelimit-reset`) are exposed. `GET /v1` returns a
+machine-readable description of the deployment — resources, simulator
+scenarios, outcome distributions, webhook event types, error codes, and limits
+— which is the recommended starting point for a client or a code generator.
+
 | Method | Path                                | Auth | Purpose                                             |
 | ------ | ----------------------------------- | ---- | --------------------------------------------------- |
 | `GET`  | `/health`                           | No   | Liveness, database check, worker state, queue depth |
 | `GET`  | `/v1/demo/session`                  | No   | Seeded demo key (development only)                  |
+| `GET`  | `/v1`                               | Yes  | Deployment capabilities, limits, and vocabularies   |
 | `GET`  | `/v1/merchants/me`                  | Yes  | Current merchant and environment                    |
 | `POST` | `/v1/payments`                      | Yes  | Create a payment; `202`                             |
 | `GET`  | `/v1/payments`                      | Yes  | List payments; `status` filter, cursor pagination   |
@@ -388,18 +397,18 @@ documented in [`DEEP_DIVE.md`](./DEEP_DIVE.md#81-storage-schema).
 
 ## 6. Console
 
-| Route           | Content                                                                                     |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| `/`             | Volume summary, animated metrics, trend chart, status composition, live feed, ledger health |
-| `/payments`     | Search, filters, creation dialog, detail timeline with attempts and refunds                 |
-| `/refunds`      | Refund ledger with status filters and live totals                                           |
-| `/ledger`       | Trial balance, account balances, posted journals                                            |
-| `/methods`      | Tokenized instruments, creation and disabling                                               |
-| `/webhooks`     | Endpoints, outbox events, delivery attempts, sink inspector                                 |
-| `/treasury`     | Payouts and disputes, with the available balance in view                                    |
-| `/playground`   | Request composer: presets, idempotency key, cURL output, response inspector                 |
-| `/guide`        | In-application architecture summary, invariants, endpoints, scenarios                       |
-| Unauthenticated | Login, with demo access or an API key                                                       |
+| Route           | Content                                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------------------------- |
+| `/`             | Volume summary, animated metrics, trend chart, status composition, control room, live feed, ledger health |
+| `/payments`     | Search, filters, creation dialog, detail timeline with attempts and refunds                               |
+| `/refunds`      | Refund ledger with status filters and live totals                                                         |
+| `/ledger`       | Trial balance, account balances, posted journals                                                          |
+| `/methods`      | Tokenized instruments, creation and disabling                                                             |
+| `/webhooks`     | Endpoints, outbox events, delivery attempts, sink inspector                                               |
+| `/treasury`     | Payouts and disputes, with the available balance in view                                                  |
+| `/playground`   | Request composer: presets, idempotency key, cURL output, response inspector                               |
+| `/guide`        | In-application architecture summary, invariants, endpoints, scenarios                                     |
+| Unauthenticated | Login, with demo access or an API key                                                                     |
 
 Presentation uses an ink and parchment palette with saffron accents, Fraunces
 for display, Inter for text and JetBrains Mono for data; status values appear
@@ -407,6 +416,12 @@ as semantic colours inside stamped monospace badges. Film grain, an ambient
 canvas, count-up metrics, reveal-on-scroll, a live clock and scroll progress
 appear in both themes, reduced-motion preferences are respected, and code
 surfaces remain dark in the light theme.
+
+Two elements carry the operational feel. A **system strip** under the header
+reports worker state, queue depth, the most recent delivery, and the API
+version, refreshing every five seconds. A **command palette** (`⌘K` or
+`Ctrl+K`) jumps to any page and runs the frequent actions — refresh all data,
+toggle the theme, sign out — with arrow-key navigation.
 
 Data is fetched through TanStack Query with a two-second stale time and a
 single retry. The console polls only where it is useful: every 1.2 seconds
@@ -458,7 +473,7 @@ and the development sink is not registered at all.
 | ----------------------------------------- | ------------------------------------------------------ |
 | `npm run dev`                             | API and console                                        |
 | `npm run seed`                            | Merchants, demo history, `data/demo-key.json`          |
-| `npm test`                                | 42 API tests                                           |
+| `npm test`                                | 44 API tests                                           |
 | `npm run typecheck`                       | API and console                                        |
 | `npm run build`                           | Console, then API                                      |
 | `npm run verify`                          | Quality gate: typecheck, test, build                   |
@@ -534,7 +549,7 @@ apps/api/src/
 ├── services/           auth · api-keys · idempotency · jobs · ledger · payments ·
 │                       refunds · payment-methods · payouts · disputes ·
 │                       webhooks · reports · serializers · stats
-└── app.test.ts         42 API tests
+└── app.test.ts         44 API tests
 
 apps/web/src/
 ├── App.tsx             Router, query client, authentication gate

@@ -33,12 +33,7 @@ import { refundRoutes } from "./routes/refunds";
 import { treasuryRoutes } from "./routes/treasury";
 import { webhookRoutes } from "./routes/webhooks";
 import { resolveApiKey } from "./services/auth";
-import {
-  API_DESCRIPTION,
-  API_TAGS,
-  API_TITLE,
-  API_VERSION,
-} from "./version";
+import { API_DESCRIPTION, API_TAGS, API_TITLE, API_VERSION } from "./version";
 import { touchApiKey } from "./services/api-keys";
 import "./types";
 
