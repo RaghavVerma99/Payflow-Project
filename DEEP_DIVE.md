@@ -648,6 +648,11 @@ schema: {
 }
 ```
 
+Examples are injected by a per-route transform, because the OpenAPI plugin
+rebuilds the media objects and drops anything a Zod schema cannot carry.
+The transform reads the operation id, looks up the example, and attaches it to
+the request body and the success response.
+
 **Know it if you can answer:** what breaks in a generated SDK when two
 operations share an `operationId`? (One method overwrites the other, and the
 client silently calls the wrong endpoint.)

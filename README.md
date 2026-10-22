@@ -9,7 +9,7 @@ console.
 | ----------------- | ------------------------------------------------------------------------------------------------------------- |
 | **Stack**         | TypeScript · Fastify 5 · Zod 4 · Drizzle ORM · SQLite (WAL) · React 19 · Vite 7 · Tailwind 4 · TanStack Query |
 | **Runtime**       | One Node process (API and worker), one SQLite file, no external services                                      |
-| **Tests**         | 44 API tests, CI-gated through `npm run verify`                                                               |
+| **Tests**         | 45 API tests, CI-gated through `npm run verify`                                                               |
 | **Documentation** | This file is the reference; [`DEEP_DIVE.md`](./DEEP_DIVE.md) explains the concepts behind it                  |
 
 > **Simulation only.** No card data is accepted, no processor is contacted, and no
@@ -264,7 +264,9 @@ Base URL `http://localhost:4000`. Requests require
 `Authorization: Bearer sk_test_…`; writes require `Content-Type: application/json`.
 
 **Conventions.** Every operation carries a stable `operationId`, so generated
-SDKs expose named methods. Every response carries `x-request-id` and
+SDKs expose named methods, and every request and response ships with a worked
+example in the OpenAPI document. Every operation also documents the shared error
+envelope for `400`, `401`, `403`, `404`, `409`, `429` and `500`. Every response carries `x-request-id` and
 `x-payflow-api-version`; rate limit headers (`x-ratelimit-limit`,
 `x-ratelimit-remaining`, `x-ratelimit-reset`) are exposed. `GET /v1` returns a
 machine-readable description of the deployment — resources, simulator
@@ -315,6 +317,125 @@ scenarios, outcome distributions, webhook event types, error codes, and limits
 | `GET`  | `/docs`, `/docs/json`               | No   | OpenAPI 3.1 document and UI                         |
 | `POST` | `/_sink/:token`                     | No   | Development webhook sink (development only)         |
 | `GET`  | `/_sink/:token`                     | No   | Inspect what the sink received (development only)   |
+
+### 5.1 A complete flow
+
+Four calls, end to end. Nothing else is required to integrate.
+
+```bash
+KEY=$(node -e "console.log(JSON.parse(require('fs').readFileSync('data/demo-key.json','utf8')).api_key)")
+
+# 1. Create. 202 Accepted — the payment exists, the processor has not answered.
+curl -s -X POST localhost:4000/v1/payments \
+  -H "Authorization: Bearer $KEY" \
+  -H "Idempotency-Key: order_1042_attempt_1" \
+  -H "Content-Type: application/json" \
+  -d '{"amount_minor":24900,"currency":"INR","customer_id":"cus_demo_101","simulator_scenario":"approve"}'
+# → { "object": "payment", "status": "created", "amount": "249.00", … }
+
+# 2. Read the live state. The worker settles it within about a second.
+curl -s localhost:4000/v1/payments/pay_2f8c1a… -H "Authorization: Bearer $KEY"
+# → { "status": "succeeded", "attempts": […], "events": […] }
+
+# 3. Refund part of it. Capacity is reserved atomically.
+curl -s -X POST localhost:4000/v1/refunds \
+  -H "Authorization: Bearer $KEY" \
+  -H "Idempotency-Key: refund_1042_1" \
+  -H "Content-Type: application/json" \
+  -d '{"payment_id":"pay_2f8c1a…","amount_minor":5000,"reason":"damaged item"}'
+# → { "object": "refund", "status": "reserved", "amount": "50.00", … }
+
+# 4. Confirm the books balance.
+curl -s localhost:4000/v1/accounts -H "Authorization: Bearer $KEY"
+# → { "trial_balance": { "balanced": true, "debits_minor": 19900, "credits_minor": 19900 }, … }
+```
+
+### 5.2 Verifying a webhook
+
+Deliveries carry an HMAC-SHA256 signature over the timestamp and the raw body.
+Verify it before trusting the payload.
+
+```ts
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export function verify(rawBody: string, header: string, secret: string) {
+  const parts = Object.fromEntries(
+    header.split(",").map((pair) => pair.split("=") as [string, string]),
+  );
+  const timestamp = parts.t;
+  const expected = createHmac("sha256", secret)
+    .update(`${timestamp}.${rawBody}`)
+    .digest("hex");
+
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+
+  const a = Buffer.from(expected, "hex");
+  const b = Buffer.from(parts.v1, "hex");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+```
+
+Reject a delivery when the timestamp is more than five minutes old; that is what
+stops a captured payload from being replayed later.
+
+### 5.3 Error catalogue
+
+Every failure uses the same envelope. `code` is stable and safe to branch on.
+
+| Code                          | Status | Cause                                     | Resolution                             |
+| ----------------------------- | ------ | ----------------------------------------- | -------------------------------------- |
+| `unauthorized`                | 401    | Missing or invalid bearer key             | Check the key, or issue a new one      |
+| `validation_error`            | 400    | Body failed the Zod contract              | Read `error.details`                   |
+| `invalid_request`             | 400    | Semantically invalid value                | Correct the field named in the message |
+| `invalid_cursor`              | 400    | Cursor is not a valid keyset token        | Drop the cursor and paginate again     |
+| `unsupported_currency`        | 400    | Currency other than `INR`                 | Use `INR`                              |
+| `invalid_scenario`            | 400    | Unknown simulator scenario                | Use one of the five documented values  |
+| `invalid_payment_method`      | 400    | Card without a four-digit `last4`         | Supply `last4`                         |
+| `invalid_webhook_url`         | 400    | Unparseable, non-http, or private address | Use an absolute public http(s) url     |
+| `simulator_controls_disabled` | 403    | Forced scenario in a locked environment   | Drop `simulator_scenario`              |
+| `not_found`                   | 404    | Unknown id, or another merchant's id      | Check the id and the tenant            |
+| `idempotency_key_reused`      | 409    | Same key, different body                  | Use a new key for a new operation      |
+| `idempotency_in_progress`     | 409    | Duplicate while the first is running      | Read the resource, then retry later    |
+| `invalid_state_transition`    | 409    | Illegal status change                     | Read the state machine                 |
+| `payment_not_refundable`      | 409    | Payment is not settled                    | Wait for `succeeded`                   |
+| `payment_not_cancelable`      | 409    | Payment already left `created`            | Only `created` can be canceled         |
+| `refund_not_cancelable`       | 409    | Refund already processing or settled      | Only `reserved` can be canceled        |
+| `refund_exceeds_remaining`    | 409    | Amount above the refundable balance       | Read `refundable_minor`                |
+| `payment_method_not_active`   | 409    | Method disabled                           | Enable a different method              |
+| `payment_not_disputable`      | 409    | Payment has not settled                   | Wait for `succeeded`                   |
+| `dispute_not_open`            | 409    | Dispute already resolved                  | Read `status`                          |
+| `insufficient_balance`        | 409    | Payout above the payable balance          | Collect more, or pay out less          |
+
+### 5.4 Event catalogue
+
+Webhooks are emitted from the same transaction as the business change.
+
+| Event               | Emitted when                                         |
+| ------------------- | ---------------------------------------------------- |
+| `payment.created`   | A payment is accepted and queued                     |
+| `payment.succeeded` | The processor approves the charge                    |
+| `payment.failed`    | The processor declines the charge                    |
+| `payment.unknown`   | The processor times out; reconciliation is scheduled |
+| `payment.canceled`  | A `created` payment is canceled                      |
+| `refund.succeeded`  | A refund settles and the journal posts               |
+| `refund.failed`     | A refund is declined and the reservation is released |
+| `refund.canceled`   | A reserved refund is canceled                        |
+| `payout.paid`       | Funds are settled out of the payable balance         |
+| `payout.failed`     | A payout is declined                                 |
+| `dispute.opened`    | A dispute is raised against a settled payment        |
+| `dispute.won`       | The merchant keeps the claim                         |
+| `dispute.lost`      | The claim is reversed against the merchant           |
+
+### 5.5 Rate limits, retries, and timeouts
+
+| Concern          | Behaviour                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| Rate limit       | 600 requests per minute per client; `x-ratelimit-remaining` reports the budget left |
+| Retry safety     | Every write accepts `Idempotency-Key`; retries replay instead of duplicating        |
+| Retry backoff    | Server-side work backs off `min(300, 2^attempts × 2)` seconds                       |
+| Read your writes | `POST` returns `202`; poll the resource until it reaches a terminal state           |
+| Uncertain states | `unknown` means _not yet known_, not _failed_; wait for reconciliation              |
+| Long polls       | No long-polling endpoints; poll at 1–2 s and respect the rate limit                 |
 
 **Simulator scenarios.** Selected with `simulator_scenario` in the body or the
 `X-Simulator-Scenario` header; the body takes precedence and `auto` is the
@@ -473,7 +594,7 @@ and the development sink is not registered at all.
 | ----------------------------------------- | ------------------------------------------------------ |
 | `npm run dev`                             | API and console                                        |
 | `npm run seed`                            | Merchants, demo history, `data/demo-key.json`          |
-| `npm test`                                | 44 API tests                                           |
+| `npm test`                                | 45 API tests                                           |
 | `npm run typecheck`                       | API and console                                        |
 | `npm run build`                           | Console, then API                                      |
 | `npm run verify`                          | Quality gate: typecheck, test, build                   |
@@ -549,7 +670,7 @@ apps/api/src/
 ├── services/           auth · api-keys · idempotency · jobs · ledger · payments ·
 │                       refunds · payment-methods · payouts · disputes ·
 │                       webhooks · reports · serializers · stats
-└── app.test.ts         44 API tests
+└── app.test.ts         45 API tests
 
 apps/web/src/
 ├── App.tsx             Router, query client, authentication gate

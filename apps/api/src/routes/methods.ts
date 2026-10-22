@@ -6,6 +6,7 @@ import {
   PaymentMethodListSchema,
   PaymentMethodSchema,
 } from "../schemas";
+import { ERROR_RESPONSES } from "../schemas";
 import {
   createPaymentMethod,
   disablePaymentMethod,
@@ -26,7 +27,10 @@ export const methodRoutes: FastifyPluginAsyncZod = async (app) => {
         description:
           "Registers a simulated instrument. No card number is ever accepted; only display metadata such as the last four digits.",
         body: CreatePaymentMethodBody,
-        response: { 201: PaymentMethodSchema },
+        response: {
+          201: PaymentMethodSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request, reply) => {
@@ -56,7 +60,10 @@ export const methodRoutes: FastifyPluginAsyncZod = async (app) => {
           app.config.defaultPageSize,
           app.config.maxPageSize,
         ),
-        response: { 200: PaymentMethodListSchema },
+        response: {
+          200: PaymentMethodListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -85,7 +92,10 @@ export const methodRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Payment methods"],
         summary: "Get a payment method",
         params: MethodParams,
-        response: { 200: PaymentMethodSchema },
+        response: {
+          200: PaymentMethodSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -106,7 +116,10 @@ export const methodRoutes: FastifyPluginAsyncZod = async (app) => {
         description:
           "Disabled methods cannot be used for new payments. Existing payments keep their instrument.",
         params: MethodParams,
-        response: { 200: PaymentMethodSchema },
+        response: {
+          200: PaymentMethodSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {

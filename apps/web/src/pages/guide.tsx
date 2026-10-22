@@ -1,13 +1,13 @@
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   BookOpen,
   CheckCircle2,
   Clock3,
-  Database,
+  Copy,
   ExternalLink,
   GitBranch,
   KeyRound,
-  Landmark,
   Layers,
   Monitor,
   Radio,
@@ -28,7 +28,9 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CopyButton,
 } from "../components/ui";
+import { api } from "../lib/api";
 import { cn } from "../lib/utils";
 
 const INVARIANTS = [
@@ -68,37 +70,10 @@ const INVARIANTS = [
     body: "Events are written with the business change, then delivered. A delivery can never be lost, and never precedes the change it describes.",
   },
   {
-    icon: Landmark,
-    title: "Bounded payouts",
-    body: "A payout is checked against the merchant payable balance inside the transaction, so it can never move uncollected money.",
+    icon: Layers,
+    title: "Derived balances",
+    body: "Balances are computed from journal entries, never stored. A payout is checked against that balance inside the writing transaction.",
   },
-  {
-    icon: Scale,
-    title: "Disputes stay separate",
-    body: "A dispute is an overlay on a settled charge. A lost claim posts a reversing journal; the charge itself remains settled.",
-  },
-];
-
-const ENDPOINTS = [
-  ["GET", "/v1", "Deployment capabilities and limits"],
-  ["POST", "/v1/payments", "Create a payment and enqueue processing"],
-  ["GET", "/v1/payments", "Cursor-paginated list with status filter"],
-  ["GET", "/v1/payments/:id", "Payment, attempts and event timeline"],
-  ["POST", "/v1/payments/:id/cancel", "Cancel before the worker claims it"],
-  ["POST", "/v1/refunds", "Reserve capacity and enqueue a refund"],
-  ["GET", "/v1/refunds", "List refunds by status or payment"],
-  ["POST", "/v1/payment_methods", "Register a tokenized instrument"],
-  ["POST", "/v1/payouts", "Pay out collected funds"],
-  ["POST", "/v1/disputes", "Open a dispute on a settled payment"],
-  ["POST", "/v1/disputes/:id/resolve", "Resolve a dispute as won or lost"],
-  ["POST", "/v1/webhook_endpoints", "Register a delivery target and secret"],
-  ["GET", "/v1/webhook_events", "The transactional outbox"],
-  ["GET", "/v1/webhook_deliveries", "Every delivery attempt"],
-  ["GET", "/v1/accounts", "Account balances and trial balance"],
-  ["GET", "/v1/ledger/journals", "Posted double-entry journals"],
-  ["GET", "/v1/stats/overview", "Dashboard aggregates"],
-  ["GET", "/v1/reports/payments", "Window report, JSON or CSV"],
-  ["GET", "/v1/reports/settlement", "One-day settlement summary"],
 ];
 
 const SCENARIOS = [
@@ -116,6 +91,35 @@ const SCENARIOS = [
   ],
   ["auto", "Deterministic hash", "Mixed outcomes for realistic demos"],
 ];
+
+const VERIFY_SNIPPET = `import { createHmac, timingSafeEqual } from "node:crypto";
+
+export function verify(rawBody: string, header: string, secret: string) {
+  const parts = Object.fromEntries(
+    header.split(",").map((pair) => pair.split("=") as [string, string]),
+  );
+  const timestamp = parts.t;
+  const expected = createHmac("sha256", secret)
+    .update(\`\${timestamp}.\${rawBody}\`)
+    .digest("hex");
+
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+
+  const a = Buffer.from(expected, "hex");
+  const b = Buffer.from(parts.v1, "hex");
+  return a.length === b.length && timingSafeEqual(a, b);
+}`;
+
+const QUICKSTART = `KEY=sk_test_...
+
+curl -s -X POST localhost:4000/v1/payments \\
+  -H "Authorization: Bearer $KEY" \\
+  -H "Idempotency-Key: order_1042_attempt_1" \\
+  -H "Content-Type: application/json" \\
+  -d '{"amount_minor":24900,"currency":"INR","simulator_scenario":"approve"}'
+
+# 202 Accepted, status "created" — poll for the settled state
+curl -s localhost:4000/v1/payments/pay_... -H "Authorization: Bearer $KEY"`;
 
 function Box({
   icon: Icon,
@@ -162,14 +166,6 @@ function Box({
   );
 }
 
-function Code({ children }: { children: string }) {
-  return (
-    <pre className="code-surface overflow-x-auto rounded-xl p-4 font-mono text-[11px] leading-relaxed text-[#d9cfbf]">
-      {children}
-    </pre>
-  );
-}
-
 function Connector() {
   return (
     <div className="flex items-center justify-center py-1 lg:py-0">
@@ -178,12 +174,28 @@ function Connector() {
   );
 }
 
+function Code({ children }: { children: string }) {
+  return (
+    <pre className="code-surface overflow-x-auto rounded-xl p-4 font-mono text-[11px] leading-relaxed text-[#d9cfbf]">
+      {children}
+    </pre>
+  );
+}
+
 export function GuidePage() {
+  const capabilitiesQuery = useQuery({
+    queryKey: ["capabilities"],
+    queryFn: api.capabilities,
+    staleTime: 60_000,
+  });
+
+  const capabilities = capabilitiesQuery.data;
+
   return (
     <div>
       <PageHeader
-        eyebrow="Chapter 06 · The craft"
-        title="Architecture"
+        eyebrow="Chapter 06 · The contract"
+        title="Architecture & API"
         description="How a request becomes a settled payment, a refund, and a balanced journal — including the failure paths most systems hide."
         actions={
           <>
@@ -192,8 +204,7 @@ export function GuidePage() {
               TypeScript
             </Badge>
             <Badge variant="outline" className="gap-1">
-              <Database className="size-3" />
-              SQLite WAL
+              OpenAPI {capabilities?.api_version ?? "3.1"}
             </Badge>
           </>
         }
@@ -266,7 +277,7 @@ export function GuidePage() {
               />
               <Connector />
               <Box
-                icon={Database}
+                icon={Layers}
                 title="SQLite WAL"
                 detail="Payments · jobs · ledger · idempotency"
                 index="03"
@@ -388,28 +399,41 @@ export function GuidePage() {
               <div>
                 <span className="label-craft">The surface</span>
                 <CardTitle className="mt-2 text-[22px]">
-                  API endpoints
+                  Live contract
                 </CardTitle>
               </div>
-              <Badge variant="outline">{ENDPOINTS.length}</Badge>
+              <Badge variant="outline">
+                {capabilities?.api_version ?? "—"}
+              </Badge>
             </CardHeader>
-            <div className="mt-4 divide-y divide-border/60">
-              {ENDPOINTS.map(([method, path, purpose]) => (
-                <div
-                  key={`${method}-${path}`}
-                  className="row-craft grid grid-cols-[42px_1fr] gap-2 px-5 py-2.5 sm:grid-cols-[42px_190px_1fr]"
-                >
-                  <span className="font-mono text-[9px] font-semibold text-primary">
-                    {method}
-                  </span>
-                  <span className="font-mono text-[10px] text-foreground">
-                    {path}
-                  </span>
-                  <span className="col-span-2 text-[10px] text-muted-foreground sm:col-span-1">
-                    {purpose}
-                  </span>
+            <div className="divide-y divide-border/60">
+              {(capabilities?.resources ?? []).map((resource) => (
+                <div key={resource.name} className="px-5 py-2.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="font-mono text-[10px] font-semibold text-primary">
+                      {resource.name}
+                    </p>
+                    <p className="truncate text-right text-[10px] text-muted-foreground">
+                      {resource.summary}
+                    </p>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {resource.endpoints.map((endpoint) => (
+                      <span
+                        key={endpoint}
+                        className="rounded border border-border/70 bg-muted/20 px-1.5 py-0.5 font-mono text-[8.5px] text-muted-foreground"
+                      >
+                        {endpoint}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               ))}
+              {capabilities ? null : (
+                <p className="px-5 py-6 text-center text-[11px] text-muted-foreground">
+                  Reading the capabilities document…
+                </p>
+              )}
             </div>
             <div className="border-t border-border/70 p-4">
               <a
@@ -434,36 +458,43 @@ export function GuidePage() {
                   Simulator scenarios
                 </CardTitle>
               </CardHeader>
-              <div className="mt-4 divide-y divide-border/60">
-                {SCENARIOS.map(([name, behaviour, result], index) => (
-                  <div key={name} className="px-5 py-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[8px] text-muted-foreground/35">
-                          {String(index + 1).padStart(2, "0")}
-                        </span>
-                        <span className="rounded-full border border-primary/20 bg-primary/[0.06] px-2 py-0.5 font-mono text-[9px] text-primary">
-                          {name}
+              <CardContent className="pt-4">
+                <div className="divide-y divide-border/60">
+                  {SCENARIOS.map(([name, behaviour, result], index) => (
+                    <div key={name} className="px-5 py-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[8px] text-muted-foreground/35">
+                            {String(index + 1).padStart(2, "0")}
+                          </span>
+                          <span className="rounded-full border border-primary/20 bg-primary/[0.06] px-2 py-0.5 font-mono text-[9px] text-primary">
+                            {name}
+                          </span>
+                        </div>
+                        <span className="text-right text-[10px] text-muted-foreground">
+                          {behaviour}
                         </span>
                       </div>
-                      <span className="text-right text-[10px] text-muted-foreground">
-                        {behaviour}
-                      </span>
+                      <p className="mt-1 pl-6 text-[10px] text-muted-foreground/70">
+                        {result}
+                      </p>
                     </div>
-                    <p className="mt-1 pl-6 text-[10px] text-muted-foreground/70">
-                      {result}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </CardContent>
             </Card>
           </Reveal>
 
           <Reveal delay={120}>
             <Card>
-              <CardHeader>
-                <span className="label-craft">The local ritual</span>
-                <CardTitle className="mt-2 text-[22px]">Run locally</CardTitle>
+              <CardHeader className="flex-row items-start justify-between space-y-0">
+                <div>
+                  <span className="label-craft">The local ritual</span>
+                  <CardTitle className="mt-2 text-[22px]">
+                    Run locally
+                  </CardTitle>
+                </div>
+                <CopyButton value={`npm install\nnpm run seed\nnpm run dev`} />
               </CardHeader>
               <CardContent className="pt-4">
                 <Code>{`npm install
@@ -477,6 +508,107 @@ npm run dev`}</Code>
             </Card>
           </Reveal>
         </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <Reveal>
+          <Card className="h-full">
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+              <div>
+                <span className="label-craft">The handshake</span>
+                <CardTitle className="mt-2 text-[22px]">
+                  First three calls
+                </CardTitle>
+              </div>
+              <CopyButton value={QUICKSTART} />
+            </CardHeader>
+            <CardContent className="pt-4">
+              <Code>{QUICKSTART}</Code>
+            </CardContent>
+          </Card>
+        </Reveal>
+
+        <Reveal delay={70}>
+          <Card className="h-full">
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+              <div>
+                <span className="label-craft">The signature</span>
+                <CardTitle className="mt-2 text-[22px]">
+                  Verify a delivery
+                </CardTitle>
+              </div>
+              <CopyButton value={VERIFY_SNIPPET} />
+            </CardHeader>
+            <CardContent className="pt-4">
+              <Code>{VERIFY_SNIPPET}</Code>
+              <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+                Header format:{" "}
+                <span className="font-mono text-foreground">
+                  {capabilities?.webhooks.signature_header ??
+                    "x-payflow-signature"}
+                </span>{" "}
+                —{" "}
+                {capabilities?.webhooks.signature_scheme ??
+                  "t=<unix-seconds>,v1=hmac_sha256(secret, `<timestamp>.<body>`)"}
+                .
+              </p>
+            </CardContent>
+          </Card>
+        </Reveal>
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <Reveal>
+          <Card className="h-full">
+            <CardHeader>
+              <span className="label-craft">The announcements</span>
+              <CardTitle className="mt-2 text-[22px]">
+                Event catalogue
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Emitted from the same transaction as the business change.
+              </p>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap gap-1.5">
+                {(capabilities?.webhooks.event_types ?? []).map((event) => (
+                  <span
+                    key={event}
+                    className="rounded-full border border-primary/20 bg-primary/[0.06] px-2.5 py-1 font-mono text-[9px] text-primary"
+                  >
+                    {event}
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </Reveal>
+
+        <Reveal delay={70}>
+          <Card className="h-full">
+            <CardHeader>
+              <span className="label-craft">The refusals</span>
+              <CardTitle className="mt-2 text-[22px]">
+                Error catalogue
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Stable codes behind one envelope, safe to branch on.
+              </p>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap gap-1.5">
+                {(capabilities?.error_codes ?? []).map((code) => (
+                  <span
+                    key={code}
+                    className="rounded-md border border-border/70 bg-muted/20 px-2 py-1 font-mono text-[9px] text-muted-foreground"
+                  >
+                    {code}
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </Reveal>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/60 bg-background/20 px-4 py-3 text-[10px] text-muted-foreground">

@@ -700,6 +700,45 @@ describe("configuration", () => {
   });
 });
 
+describe("openapi document", () => {
+  it("publishes operation ids, examples and the error envelope", async () => {
+    const response = await app.inject({ method: "GET", url: "/docs/json" });
+    expect(response.statusCode).toBe(200);
+
+    const document = response.json() as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            operationId?: string;
+            requestBody?: { content: Record<string, { example?: unknown }> };
+            responses: Record<
+              string,
+              { content?: Record<string, { example?: unknown }> }
+            >;
+          }
+        >
+      >;
+    };
+
+    const create = document.paths["/v1/payments"].post;
+    expect(create.operationId).toBe("createPayment");
+    expect(
+      create.requestBody?.content["application/json"].example,
+    ).toMatchObject({ amount_minor: 24900, currency: "INR" });
+    expect(
+      create.responses["202"].content?.["application/json"].example,
+    ).toMatchObject({ object: "payment", status: "created" });
+    expect(
+      create.responses["409"].content?.["application/json"].example,
+    ).toMatchObject({ error: { code: "idempotency_key_reused" } });
+
+    const capabilities = document.paths["/v1"].get;
+    expect(capabilities.operationId).toBe("getCapabilities");
+  });
+});
+
 describe("capabilities", () => {
   it("describes the deployment for clients and generators", async () => {
     const response = await app.inject({

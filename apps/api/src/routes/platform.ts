@@ -8,6 +8,7 @@ import {
   ReportQuery,
   SettlementQuery,
 } from "../schemas";
+import { ERROR_RESPONSES } from "../schemas";
 import { createApiKey, listApiKeys, revokeApiKey } from "../services/api-keys";
 import {
   normalizeWindow,
@@ -51,7 +52,10 @@ export const platformRoutes: FastifyPluginAsyncZod = async (app) => {
         operationId: "listApiKeys",
         tags: ["Merchants"],
         summary: "List API keys",
-        response: { 200: ApiKeyListSchema },
+        response: {
+          200: ApiKeyListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -69,7 +73,10 @@ export const platformRoutes: FastifyPluginAsyncZod = async (app) => {
         summary: "Revoke an API key",
         description: "Revoked keys are rejected immediately.",
         params: ApiKeyParams,
-        response: { 200: ApiKeySchema },
+        response: {
+          200: ApiKeySchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {

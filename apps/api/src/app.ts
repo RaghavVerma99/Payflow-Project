@@ -32,6 +32,7 @@ import { readRoutes } from "./routes/read";
 import { refundRoutes } from "./routes/refunds";
 import { treasuryRoutes } from "./routes/treasury";
 import { webhookRoutes } from "./routes/webhooks";
+import { applyOpenApiExamples } from "./openapi-examples";
 import { resolveApiKey } from "./services/auth";
 import { API_DESCRIPTION, API_TAGS, API_TITLE, API_VERSION } from "./version";
 import { touchApiKey } from "./services/api-keys";
@@ -187,7 +188,11 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
       },
       security: [{ bearerAuth: [] }],
     },
-    transform: jsonSchemaTransform,
+    transform: (input) => {
+      const transformed = jsonSchemaTransform(input);
+      const schema = transformed?.schema ?? input.schema;
+      return { ...transformed, schema: applyOpenApiExamples(schema) };
+    },
   });
   void app.register(swaggerUi, {
     routePrefix: "/docs",

@@ -10,6 +10,7 @@ import {
   PaymentSchema,
   RefundListSchema,
 } from "../schemas";
+import { ERROR_RESPONSES } from "../schemas";
 import {
   cancelPayment,
   createPayment,
@@ -64,7 +65,10 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
         description:
           "Creates a payment and enqueues it for asynchronous processing. Send an Idempotency-Key header to make retries safe.",
         body: CreatePaymentBody,
-        response: { 202: PaymentSchema },
+        response: {
+          202: PaymentSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request, reply) => {
@@ -106,7 +110,10 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
           app.config.defaultPageSize,
           app.config.maxPageSize,
         ),
-        response: { 200: PaymentListSchema },
+        response: {
+          200: PaymentListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -128,7 +135,10 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Payments"],
         summary: "Get a payment with attempts and events",
         params: PaymentParams,
-        response: { 200: PaymentDetailSchema },
+        response: {
+          200: PaymentDetailSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -145,7 +155,10 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Payments"],
         summary: "Cancel a payment that has not been processed",
         params: PaymentParams,
-        response: { 200: PaymentSchema },
+        response: {
+          200: PaymentSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -171,7 +184,10 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
           app.config.defaultPageSize,
           app.config.maxPageSize,
         ),
-        response: { 200: RefundListSchema },
+        response: {
+          200: RefundListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {

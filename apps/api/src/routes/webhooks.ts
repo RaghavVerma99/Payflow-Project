@@ -15,6 +15,7 @@ import {
   WebhookEventListSchema,
   WebhookEventSchema,
 } from "../schemas";
+import { ERROR_RESPONSES } from "../schemas";
 import {
   createEndpoint,
   disableEndpoint,
@@ -75,7 +76,10 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
         operationId: "listWebhookEndpoints",
         tags: ["Webhooks"],
         summary: "List webhook endpoints",
-        response: { 200: WebhookEndpointListSchema },
+        response: {
+          200: WebhookEndpointListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -96,7 +100,10 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Webhooks"],
         summary: "Disable a webhook endpoint",
         params: EndpointParams,
-        response: { 200: WebhookEndpointSchema },
+        response: {
+          200: WebhookEndpointSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -118,7 +125,10 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
           app.config.defaultPageSize,
           app.config.maxPageSize,
         ),
-        response: { 200: WebhookEventListSchema },
+        response: {
+          200: WebhookEventListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -146,7 +156,10 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Webhooks"],
         summary: "Get a webhook event",
         params: EndpointParams,
-        response: { 200: WebhookEventSchema },
+        response: {
+          200: WebhookEventSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -168,7 +181,10 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
           app.config.defaultPageSize,
           app.config.maxPageSize,
         ),
-        response: { 200: WebhookDeliveryListSchema },
+        response: {
+          200: WebhookDeliveryListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {

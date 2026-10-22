@@ -7,6 +7,7 @@ import {
   WEBHOOK_EVENT_TYPES,
 } from "../domain";
 import { API_VERSION } from "../version";
+import { ERROR_RESPONSES } from "../schemas";
 
 const CapabilitiesSchema = z.object({
   object: z.literal("capabilities"),
@@ -162,7 +163,10 @@ export const metaRoutes: FastifyPluginAsyncZod = async (app) => {
         summary: "Deployment capabilities",
         description:
           "A machine-readable description of this deployment: available resources, simulator scenarios, webhook event types, error codes, and limits. Point an SDK generator or a client bootstrapper at this document.",
-        response: { 200: CapabilitiesSchema },
+        response: {
+          200: CapabilitiesSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {

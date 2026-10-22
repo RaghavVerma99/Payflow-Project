@@ -6,6 +6,7 @@ import {
   RefundParams,
   RefundSchema,
 } from "../schemas";
+import { ERROR_RESPONSES } from "../schemas";
 import {
   createRefund,
   cancelRefund,
@@ -27,7 +28,10 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
         description:
           "Reserves refundable capacity atomically, then enqueues processor work. Supports partial refunds and Idempotency-Key.",
         body: CreateRefundBody,
-        response: { 202: RefundSchema },
+        response: {
+          202: RefundSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request, reply) => {
@@ -67,7 +71,10 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
           app.config.defaultPageSize,
           app.config.maxPageSize,
         ),
-        response: { 200: RefundListSchema },
+        response: {
+          200: RefundListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -90,7 +97,10 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Refunds"],
         summary: "Get a refund",
         params: RefundParams,
-        response: { 200: RefundSchema },
+        response: {
+          200: RefundSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -109,7 +119,10 @@ export const refundRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Refunds"],
         summary: "Cancel a reserved refund and release its capacity",
         params: RefundParams,
-        response: { 200: RefundSchema },
+        response: {
+          200: RefundSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {

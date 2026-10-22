@@ -9,6 +9,7 @@ import {
   TimeseriesQuery,
   TimeseriesSchema,
 } from "../schemas";
+import { ERROR_RESPONSES } from "../schemas";
 import {
   accountSummaries,
   listJournals,
@@ -25,7 +26,10 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
         operationId: "getMerchant",
         tags: ["Merchants"],
         summary: "Current merchant",
-        response: { 200: MerchantSchema },
+        response: {
+          200: MerchantSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -46,7 +50,10 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
         operationId: "listAccounts",
         tags: ["Ledger"],
         summary: "Accounts and trial balance",
-        response: { 200: AccountsResponseSchema },
+        response: {
+          200: AccountsResponseSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -69,7 +76,10 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
           app.config.defaultPageSize,
           app.config.maxPageSize,
         ),
-        response: { 200: JournalListSchema },
+        response: {
+          200: JournalListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -91,7 +101,10 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
         operationId: "getOverview",
         tags: ["Analytics"],
         summary: "Dashboard overview",
-        response: { 200: OverviewSchema },
+        response: {
+          200: OverviewSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -108,7 +121,10 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Analytics"],
         summary: "Daily payment volume",
         querystring: TimeseriesQuery,
-        response: { 200: TimeseriesSchema },
+        response: {
+          200: TimeseriesSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {

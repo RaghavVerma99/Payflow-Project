@@ -12,6 +12,7 @@ import {
   PayoutSchema,
   ResolveDisputeBody,
 } from "../schemas";
+import { ERROR_RESPONSES } from "../schemas";
 import { createPayout, getPayout, listPayouts } from "../services/payouts";
 import {
   createDispute,
@@ -34,7 +35,10 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
         description:
           "Moves money out of the merchant payable balance and into the merchant bank account. Rejected when the payable balance is insufficient.",
         body: CreatePayoutBody,
-        response: { 202: PayoutSchema },
+        response: {
+          202: PayoutSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request, reply) => {
@@ -73,7 +77,10 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
           app.config.defaultPageSize,
           app.config.maxPageSize,
         ),
-        response: { 200: PayoutListSchema },
+        response: {
+          200: PayoutListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -100,7 +107,10 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Treasury"],
         summary: "Get a payout",
         params: PayoutParams,
-        response: { 200: PayoutSchema },
+        response: {
+          200: PayoutSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -119,7 +129,10 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Treasury"],
         summary: "Open a dispute against a settled payment",
         body: CreateDisputeBody,
-        response: { 201: DisputeSchema },
+        response: {
+          201: DisputeSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request, reply) => {
@@ -148,7 +161,10 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
           app.config.defaultPageSize,
           app.config.maxPageSize,
         ),
-        response: { 200: DisputeListSchema },
+        response: {
+          200: DisputeListSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -175,7 +191,10 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Treasury"],
         summary: "Get a dispute",
         params: DisputeParams,
-        response: { 200: DisputeSchema },
+        response: {
+          200: DisputeSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {
@@ -197,7 +216,10 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
           "A lost dispute debits the merchant payable and credits processor clearing. A won dispute posts nothing.",
         body: ResolveDisputeBody,
         params: DisputeParams,
-        response: { 200: DisputeSchema },
+        response: {
+          200: DisputeSchema,
+          ...ERROR_RESPONSES,
+        },
       },
     },
     async (request) => {

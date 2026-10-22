@@ -10,44 +10,101 @@ import {
 
 const ISODate = z.string();
 
-export const PaymentMethodSchema = z.object({
-  object: z.literal("payment_method"),
-  id: z.string(),
-  type: z.enum(PAYMENT_METHOD_TYPES),
-  label: z.string(),
-  last4: z.string().nullable(),
-  network: z.string().nullable(),
-  expiry_month: z.number().int().nullable(),
-  expiry_year: z.number().int().nullable(),
-  status: z.string(),
-  created_at: ISODate,
-});
+export const PaymentMethodSchema = z
+  .object({
+    object: z.literal("payment_method"),
+    id: z.string(),
+    type: z.enum(PAYMENT_METHOD_TYPES),
+    label: z.string(),
+    last4: z.string().nullable(),
+    network: z.string().nullable(),
+    expiry_month: z.number().int().nullable(),
+    expiry_year: z.number().int().nullable(),
+    status: z.string(),
+    created_at: ISODate,
+  })
+  .meta({
+    description:
+      "A tokenized instrument. Only display metadata is stored; a card number is never accepted.",
+    examples: [
+      {
+        object: "payment_method",
+        id: "pm_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+        type: "card",
+        label: "Acme corporate card",
+        last4: "4242",
+        network: "visa",
+        expiry_month: 11,
+        expiry_year: 2030,
+        status: "active",
+        created_at: "2026-10-21T08:30:00.000Z",
+      },
+    ],
+  });
 
-export const PayoutSchema = z.object({
-  object: z.literal("payout"),
-  id: z.string(),
-  status: z.enum(PAYOUT_STATUSES),
-  amount_minor: z.number().int(),
-  amount: z.string(),
-  currency: z.string(),
-  destination: z.string(),
-  failure_code: z.string().nullable(),
-  created_at: ISODate,
-  updated_at: ISODate,
-});
+export const PayoutSchema = z
+  .object({
+    object: z.literal("payout"),
+    id: z.string(),
+    status: z.enum(PAYOUT_STATUSES),
+    amount_minor: z.number().int(),
+    amount: z.string(),
+    currency: z.string(),
+    destination: z.string(),
+    failure_code: z.string().nullable(),
+    created_at: ISODate,
+    updated_at: ISODate,
+  })
+  .meta({
+    description:
+      "A payout of collected funds. The amount is bounded by the merchant payable balance.",
+    examples: [
+      {
+        object: "payout",
+        id: "po_5e4d3c2b1a09f8e7d6c5b4a39281706f5",
+        status: "paid",
+        amount_minor: 5000,
+        amount: "50.00",
+        currency: "INR",
+        destination: "bank://hdfc-7788",
+        failure_code: null,
+        created_at: "2026-10-21T09:10:00.000Z",
+        updated_at: "2026-10-21T09:10:00.318Z",
+      },
+    ],
+  });
 
-export const DisputeSchema = z.object({
-  object: z.literal("dispute"),
-  id: z.string(),
-  payment_id: z.string(),
-  status: z.enum(DISPUTE_STATUSES),
-  amount_minor: z.number().int(),
-  amount: z.string(),
-  reason: z.string(),
-  note: z.string().nullable(),
-  created_at: ISODate,
-  resolved_at: z.string().nullable(),
-});
+export const DisputeSchema = z
+  .object({
+    object: z.literal("dispute"),
+    id: z.string(),
+    payment_id: z.string(),
+    status: z.enum(DISPUTE_STATUSES),
+    amount_minor: z.number().int(),
+    amount: z.string(),
+    reason: z.string(),
+    note: z.string().nullable(),
+    created_at: ISODate,
+    resolved_at: z.string().nullable(),
+  })
+  .meta({
+    description:
+      "A dispute against a settled payment. Resolving it as lost posts a reversing journal.",
+    examples: [
+      {
+        object: "dispute",
+        id: "dp_0f9e8d7c6b5a493827160f5e4d3c2b1a",
+        payment_id: "pay_2f8c1a9d4e6b7c8d9e0f1a2b3c4d5e6f",
+        status: "open",
+        amount_minor: 2000,
+        amount: "20.00",
+        reason: "Customer claims the order never arrived",
+        note: "Awaiting carrier evidence",
+        created_at: "2026-10-21T09:20:00.000Z",
+        resolved_at: null,
+      },
+    ],
+  });
 
 export const WebhookEndpointSchema = z.object({
   object: z.literal("webhook_endpoint"),
@@ -94,6 +151,40 @@ export const ApiKeySchema = z.object({
   status: z.enum(["active", "revoked"]),
 });
 
+export const ErrorSchema = z
+  .object({
+    error: z.object({
+      code: z.string(),
+      message: z.string(),
+      details: z.unknown().optional(),
+      request_id: z.string(),
+    }),
+  })
+  .meta({
+    description:
+      "Every failure uses this envelope. `code` is stable and machine-readable; `request_id` correlates the failure with the server logs.",
+    examples: [
+      {
+        error: {
+          code: "idempotency_key_reused",
+          message:
+            "This idempotency key was already used with a different request body.",
+          request_id: "req_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+        },
+      },
+    ],
+  });
+
+export const ERROR_RESPONSES = {
+  400: ErrorSchema,
+  401: ErrorSchema,
+  403: ErrorSchema,
+  404: ErrorSchema,
+  409: ErrorSchema,
+  429: ErrorSchema,
+  500: ErrorSchema,
+};
+
 export const PaymentMethodListSchema = z.object({
   data: z.array(PaymentMethodSchema),
   has_more: z.boolean(),
@@ -132,23 +223,47 @@ export const ApiKeyListSchema = z.object({
   data: z.array(ApiKeySchema),
 });
 
-export const PaymentSchema = z.object({
-  object: z.literal("payment"),
-  id: z.string(),
-  status: z.enum(PAYMENT_STATUSES),
-  amount_minor: z.number().int(),
-  amount: z.string(),
-  currency: z.string(),
-  customer_id: z.string().nullable(),
-  description: z.string().nullable(),
-  payment_method_id: z.string().nullable(),
-  failure_code: z.string().nullable(),
-  refunded_minor: z.number().int(),
-  refund_reserved_minor: z.number().int(),
-  refundable_minor: z.number().int(),
-  created_at: ISODate,
-  updated_at: ISODate,
-});
+export const PaymentSchema = z
+  .object({
+    object: z.literal("payment"),
+    id: z.string(),
+    status: z.enum(PAYMENT_STATUSES),
+    amount_minor: z.number().int(),
+    amount: z.string(),
+    currency: z.string(),
+    customer_id: z.string().nullable(),
+    description: z.string().nullable(),
+    payment_method_id: z.string().nullable(),
+    failure_code: z.string().nullable(),
+    refunded_minor: z.number().int(),
+    refund_reserved_minor: z.number().int(),
+    refundable_minor: z.number().int(),
+    created_at: ISODate,
+    updated_at: ISODate,
+  })
+  .meta({
+    description:
+      "A payment. Amounts are integer minor units; `amount` is the derived display string.",
+    examples: [
+      {
+        object: "payment",
+        id: "pay_2f8c1a9d4e6b7c8d9e0f1a2b3c4d5e6f",
+        status: "succeeded",
+        amount_minor: 24900,
+        amount: "249.00",
+        currency: "INR",
+        customer_id: "cus_demo_101",
+        description: "Order #1042",
+        payment_method_id: "pm_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+        failure_code: null,
+        refunded_minor: 0,
+        refund_reserved_minor: 0,
+        refundable_minor: 24900,
+        created_at: "2026-10-21T09:00:00.000Z",
+        updated_at: "2026-10-21T09:00:01.482Z",
+      },
+    ],
+  });
 
 export const PaymentAttemptSchema = z.object({
   id: z.string(),
@@ -174,19 +289,39 @@ export const PaymentDetailSchema = PaymentSchema.extend({
   events: z.array(PaymentEventSchema),
 });
 
-export const RefundSchema = z.object({
-  object: z.literal("refund"),
-  id: z.string(),
-  payment_id: z.string(),
-  status: z.enum(REFUND_STATUSES),
-  amount_minor: z.number().int(),
-  amount: z.string(),
-  currency: z.string(),
-  reason: z.string().nullable(),
-  failure_code: z.string().nullable(),
-  created_at: ISODate,
-  updated_at: ISODate,
-});
+export const RefundSchema = z
+  .object({
+    object: z.literal("refund"),
+    id: z.string(),
+    payment_id: z.string(),
+    status: z.enum(REFUND_STATUSES),
+    amount_minor: z.number().int(),
+    amount: z.string(),
+    currency: z.string(),
+    reason: z.string().nullable(),
+    failure_code: z.string().nullable(),
+    created_at: ISODate,
+    updated_at: ISODate,
+  })
+  .meta({
+    description:
+      "A refund. Capacity is reserved when the refund is created and consumed when it settles.",
+    examples: [
+      {
+        object: "refund",
+        id: "ref_9f8e7d6c5b4a39281706f5e4d3c2b1a09",
+        payment_id: "pay_2f8c1a9d4e6b7c8d9e0f1a2b3c4d5e6f",
+        status: "succeeded",
+        amount_minor: 5000,
+        amount: "50.00",
+        currency: "INR",
+        reason: "damaged item",
+        failure_code: null,
+        created_at: "2026-10-21T09:05:00.000Z",
+        updated_at: "2026-10-21T09:05:00.612Z",
+      },
+    ],
+  });
 
 export const PaymentListSchema = z.object({
   data: z.array(PaymentSchema),

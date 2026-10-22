@@ -140,6 +140,37 @@ export interface PaymentReport {
   }[];
 }
 
+export interface Capabilities {
+  object: "capabilities";
+  api_version: string;
+  environment: string;
+  merchant: { id: string; name: string };
+  resources: {
+    name: string;
+    summary: string;
+    endpoints: string[];
+  }[];
+  simulator: {
+    scenarios: string[];
+    outcome_distributions: Record<string, unknown>;
+    payment_method_types: string[];
+  };
+  webhooks: {
+    event_types: string[];
+    signature_header: string;
+    signature_scheme: string;
+  };
+  limits: {
+    max_amount_minor: number;
+    default_page_size: number;
+    max_page_size: number;
+    rate_limit_per_minute: number;
+    idempotency_ttl_hours: number;
+    max_job_attempts: number;
+  };
+  error_codes: string[];
+}
+
 export interface SettlementReport {
   date: string;
   captured_minor: number;
@@ -566,6 +597,8 @@ export const api = {
         cursor: params?.cursor,
       })}`,
     ),
+
+  capabilities: () => request<Capabilities>("/v1"),
 
   apiKeys: () => request<{ data: ApiKey[] }>("/v1/api_keys"),
   createApiKey: (name?: string | null) =>
