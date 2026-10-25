@@ -102,19 +102,25 @@ export function createEndpoint(
 }
 
 export function isPrivateHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  const host = hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "");
 
   if (host === "localhost" || host.endsWith(".localhost")) return true;
   const family = isIP(host);
   if (family === 4) {
     const octets = host.split(".").map(Number);
-    const [a, b] = octets;
+    const [a, b, c] = octets;
     return (
       a === 0 || a === 10 || a === 127 ||
       (a === 100 && b >= 64 && b <= 127) ||
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && (b === 0 || b === 168)) ||
+      (a === 192 &&
+        (b === 168 ||
+          (b === 0 && (c === 0 || c === 2)) ||
+          (b === 88 && c === 99))) ||
       (a === 198 && (b === 18 || b === 19)) ||
       a >= 224
     );
@@ -126,12 +132,16 @@ export function isPrivateHost(hostname: string): boolean {
   const first = Number.parseInt(expanded.slice(0, 4), 16);
   const address = BigInt(`0x${expanded}`);
   const inRange = (prefix: bigint, bits: number) =>
-    address >> BigInt(128 - bits) === prefix;
+    address >> BigInt(128 - bits) ===
+    prefix >> BigInt(128 - bits);
   if (address === 0n || address === 1n) return true;
   if ((first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80) return true;
   if ((first & 0xff00) === 0xff00) return true;
-  if (!inRange(0x2000n, 3)) return true;
-  if (inRange(0x20010db8n, 32) || inRange(0x20010000n, 23)) return true;
+  if (!inRange(0x2000n << 112n, 3)) return true;
+  if (
+    inRange(0x20010db8n << 96n, 32) ||
+    inRange(0x20010000n << 96n, 23)
+  ) return true;
   return false;
 }
 
@@ -140,8 +150,15 @@ function expandIpv6(host: string): string | null {
   if (value.includes(".")) {
     const split = value.lastIndexOf(":");
     const octets = value.slice(split + 1).split(".").map(Number);
-    if (octets.length !== 4 || octets.some((part) => part < 0 || part > 255)) return null;
-    value = `${value.slice(0, split)}:${((octets[0] << 8) | octets[1]).toString(16)}:${((octets[2] << 8) | octets[3]).toString(16)}`;
+    if (
+      octets.length !== 4 ||
+      octets.some((part) => part < 0 || part > 255)
+    ) {
+      return null;
+    }
+    const upper = ((octets[0] << 8) | octets[1]).toString(16);
+    const lower = ((octets[2] << 8) | octets[3]).toString(16);
+    value = `${value.slice(0, split)}:${upper}:${lower}`;
   }
   const halves = value.split("::");
   if (halves.length > 2) return null;
@@ -150,7 +167,12 @@ function expandIpv6(host: string): string | null {
   const zeros = 8 - left.length - right.length;
   if (zeros < 0 || (halves.length === 1 && zeros !== 0)) return null;
   const groups = [...left, ...Array(zeros).fill("0"), ...right];
-  if (groups.length !== 8 || groups.some((group) => !/^[\da-f]{1,4}$/i.test(group))) return null;
+  if (
+    groups.length !== 8 ||
+    groups.some((group) => !/^[\da-f]{1,4}$/i.test(group))
+  ) {
+    return null;
+  }
   return groups.map((group) => group.padStart(4, "0")).join("");
 }
 
@@ -176,9 +198,10 @@ async function postPinned(
     const request = transport.request(target, {
       method: "POST",
       headers,
-      servername: target.protocol === "https:" && isIP(target.hostname) === 0
-        ? target.hostname
-        : undefined,
+      servername:
+        target.protocol === "https:" && isIP(target.hostname) === 0
+          ? target.hostname
+          : undefined,
       lookup: (_hostname, _options, callback) =>
         callback(null, address.address, address.family),
     }, (response) => {
@@ -186,11 +209,12 @@ async function postPinned(
       let size = 0;
       response.on("data", (chunk: Buffer | string) => {
         const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        if (size < 4096) {
-          const keep = buffer.subarray(0, 4096 - size);
-          chunks.push(keep);
-          size += keep.length;
+        if (size + buffer.length > 4096) {
+          response.destroy(new Error("Webhook response exceeded 4 KB."));
+          return;
         }
+        chunks.push(buffer);
+        size += buffer.length;
       });
       response.on("end", () => resolve({
         status: response.statusCode ?? 0,
@@ -198,7 +222,10 @@ async function postPinned(
       }));
       response.on("error", reject);
     });
-    const timer = setTimeout(() => request.destroy(new Error("Webhook request timed out.")), timeoutMs);
+    const timer = setTimeout(
+      () => request.destroy(new Error("Webhook request timed out.")),
+      timeoutMs,
+    );
     timer.unref();
     request.on("close", () => clearTimeout(timer));
     request.on("error", reject);
@@ -385,18 +412,27 @@ export async function deliverToEndpoint(
 
   try {
     const target = new URL(endpoint.url);
+    if (target.username || target.password) {
+      throw new Error("Webhook url must not include credentials.");
+    }
     if (target.protocol !== "http:" && target.protocol !== "https:") {
       throw new Error("Webhook url must use http or https.");
     }
     const address = await destinationAddress(target.hostname, allowPrivateHosts);
-    const response = await postPinned(target, address, {
+    const response = await postPinned(
+      target,
+      address,
+      {
         "content-type": "application/json",
         "user-agent": "PayFlow-Webhooks/1.0",
         "x-payflow-event": event.type,
         "x-payflow-event-id": event.id,
         "x-payflow-delivery": `${event.id}.${attempt}`,
         "x-payflow-signature": signature,
-      }, body, timeoutMs);
+      },
+      body,
+      timeoutMs,
+    );
     const text = response.body;
 
     if (response.status < 200 || response.status >= 300) {
@@ -412,7 +448,7 @@ export async function deliverToEndpoint(
     return {
       endpointId: endpoint.id,
       status: "delivered",
-        responseStatus: response.status,
+      responseStatus: response.status,
       responseBody: text.slice(0, 500),
       error: null,
     };

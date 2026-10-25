@@ -1059,7 +1059,7 @@ flowchart LR
 
 | I want to…                  | Touch                                                                                  | Watch out for                                                              |
 | --------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Add a payment status        | `domain.ts` (`PAYMENT_STATUSES`, `ALLOWED_TRANSITIONS`), `schemas.ts`, `schema-sql.ts` | The DB `CHECK` is the contract; existing files need a rebuild or migration |
+| Add a payment status        | `domain.ts` (`PAYMENT_STATUSES`, `ALLOWED_TRANSITIONS`), `schemas.ts`, `schema-sql.ts`, `db.ts` | Add a numbered migration to update the DB `CHECK` for existing files |
 | Add a refund status         | `REFUND_STATUSES`, `schema-sql.ts` (`refunds`), `web/src/lib/api.ts`                   | `unknown` must be allowed in the `refunds` CHECK                           |
 | Add an endpoint             | `routes/*.ts` + a service function                                                     | Zod request _and_ response schemas; `preHandler: [app.authenticate]`       |
 | Change a response field     | `services/serializers.ts`, `schemas.ts`, `web/src/lib/api.ts`                          | The web client type changes in the same commit                             |
@@ -1079,8 +1079,8 @@ flowchart LR
 **A. Add a status `on_hold`**
 
 1. `domain.ts`: add it to `PAYMENT_STATUSES` and to `ALLOWED_TRANSITIONS`.
-2. `schema-sql.ts`: add it to the `payments.status` CHECK. Existing databases
-   need a rebuild — `db.ts` shows the in-place migration pattern.
+2. `schema-sql.ts`: add it to the `payments.status` CHECK and add a numbered,
+   transactional migration in `db.ts` for existing databases.
 3. `schemas.ts`: `PaymentSchema` inherits it from `PAYMENT_STATUSES`.
 4. `web/src/lib/api.ts`: add it to the `PaymentStatus` union.
 5. `components/status.tsx`: add a `StatusStyle` (label, variant, icon).
@@ -1264,9 +1264,11 @@ payments/refunds ── job.aggregate_id (logical, not a foreign key)
 ```
 
 SQLite is configured on start-up with `journal_mode = WAL`,
-`foreign_keys = ON`, `busy_timeout = 30000`, and `synchronous = NORMAL`. The
-schema is applied idempotently; no migration framework is present, so schema
-changes require the database to be rebuilt.
+`foreign_keys = ON`, `busy_timeout = 30000`, and `synchronous = NORMAL`. Schema
+changes run as ordered, transactional migrations recorded in
+`schema_migrations`; the initial migration also upgrades databases created by
+earlier versions. Add a new migration for each future schema change and preserve
+existing migration files once released.
 
 ## 8.2 Glossary
 

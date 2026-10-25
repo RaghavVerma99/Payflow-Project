@@ -21,7 +21,6 @@ import { Toaster } from "sonner";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 import { cn } from "../lib/utils";
-import { AmbientCanvas } from "./ambient";
 import { CommandPalette } from "./command-palette";
 import { LiveClock } from "./motion";
 import { SystemStrip } from "./system-strip";
@@ -74,9 +73,11 @@ export function Logo({ compact = false }: { compact?: boolean }) {
       </div>
       {compact ? null : (
         <div className="leading-none">
-          <p className="display text-[21px] leading-none">PayFlow</p>
-          <p className="mt-1.5 font-mono text-[8px] font-medium uppercase tracking-[0.26em] text-muted-foreground/80">
-            Payment atelier
+          <p className="text-[18px] font-semibold leading-none tracking-[-0.04em]">
+            PayFlow
+          </p>
+          <p className="mt-1.5 font-mono text-[8px] font-medium uppercase tracking-[0.16em] text-muted-foreground/80">
+            Payment operations
           </p>
         </div>
       )}
@@ -106,10 +107,10 @@ function NavItem({
       onClick={onClick}
       className={({ isActive }) =>
         cn(
-          "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-300",
+          "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors duration-150",
           isActive
-            ? "bg-gradient-to-r from-primary/14 via-primary/5 to-transparent text-foreground"
-            : "text-muted-foreground hover:bg-foreground/[0.035] hover:text-foreground",
+            ? "bg-primary/10 text-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
         )
       }
     >
@@ -169,7 +170,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[17rem] flex-col border-r border-border/80 bg-card/40 backdrop-blur-2xl transition-transform duration-300 lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-[15.5rem] flex-col border-r border-border bg-card transition-transform duration-300 lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -188,7 +189,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
         <div className="flex-1 overflow-y-auto px-3 pb-4">
           <p className="px-3 pb-2.5 font-mono text-[8px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/55">
-            The workspace
+            Workspace
           </p>
           <nav className="space-y-0.5">
             {NAV.slice(0, 4).map((item) => (
@@ -197,7 +198,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
           </nav>
 
           <p className="px-3 pb-2.5 pt-7 font-mono text-[8px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/55">
-            The tools
+            Tools
           </p>
           <nav className="space-y-0.5">
             {NAV.slice(4).map((item) => (
@@ -226,11 +227,11 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                   <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
                 </span>
                 <p className="font-mono text-[8px] font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
-                  Simulation live
+                  Sandbox active
                 </p>
               </div>
               <p className="display-soft mt-2.5 text-[15px] leading-snug">
-                A safe place to move imaginary money.
+                A clear view of every transaction.
               </p>
               <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
                 Deterministic processor. No card data. Nothing leaves the
@@ -271,31 +272,9 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
-function ScrollProgress() {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const onScroll = () => {
-      const max = document.documentElement.scrollHeight - window.innerHeight;
-      setProgress(max > 0 ? Math.min(1, window.scrollY / max) : 0);
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] h-[2px]">
-      <div
-        className="h-full origin-left bg-gradient-to-r from-primary via-primary/70 to-transparent transition-transform duration-150 ease-out"
-        style={{ transform: `scaleX(${progress})` }}
-      />
-    </div>
-  );
-}
-
 export function AppShell() {
   const [open, setOpen] = useState(false);
+  const { merchant } = useAuth();
   const { theme, toggle } = useTheme();
   const location = useLocation();
   const title = TITLES[location.pathname] ?? "PayFlow";
@@ -313,12 +292,10 @@ export function AppShell() {
 
   return (
     <div className="relative min-h-dvh">
-      <AmbientCanvas />
-      <ScrollProgress />
       <Sidebar open={open} onClose={() => setOpen(false)} />
 
-      <div className="relative z-10 lg:pl-[17rem]">
-        <header className="glass sticky top-0 z-30 flex h-[72px] items-center gap-3 border-b border-border/70 px-4 sm:px-6 lg:px-9">
+      <div className="relative z-10 lg:pl-[15.5rem]">
+        <header className="sticky top-0 z-30 flex h-[64px] items-center gap-3 border-b border-border bg-card/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <Button
             variant="ghost"
             size="icon"
@@ -331,10 +308,10 @@ export function AppShell() {
 
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <span className="hidden font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground/60 sm:inline">
-              Atelier
+              PayFlow
             </span>
             <span className="hidden h-3 w-px bg-border sm:inline" />
-            <span className="truncate text-[13px] font-medium tracking-[-0.01em]">
+            <span className="truncate text-[14px] font-semibold tracking-[-0.02em]">
               {title}
             </span>
           </div>
@@ -347,8 +324,8 @@ export function AppShell() {
             <LiveClock className="text-muted-foreground/70" />
           </div>
 
-          <div className="hidden -rotate-2 items-center gap-1.5 rounded-md border border-dashed border-amber-500/40 bg-amber-500/8 px-2.5 py-1 font-mono text-[8px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300 sm:flex">
-            Test environment
+          <div className="hidden items-center gap-1.5 rounded-md border border-amber-500/25 bg-amber-500/8 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-800 dark:text-amber-300 sm:flex">
+            {merchant?.environment ?? "dev"} environment
           </div>
 
           <Button
@@ -384,7 +361,7 @@ export function AppShell() {
 
         <SystemStrip />
 
-        <main className="mx-auto w-full max-w-[1480px] px-4 py-7 sm:px-6 lg:px-9 lg:py-10">
+        <main className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div key={location.pathname} className="animate-page">
             <Outlet />
           </div>
@@ -452,7 +429,7 @@ export function PageHeader({
               </p>
             </div>
           ) : null}
-          <h1 className="display text-[36px] leading-[0.98] sm:text-[46px]">
+          <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.045em] sm:text-[36px]">
             {title}
           </h1>
           {description ? (
@@ -465,7 +442,7 @@ export function PageHeader({
           <div className="flex shrink-0 items-center gap-2">{actions}</div>
         ) : null}
       </div>
-      <div className="mt-5 hairline" />
+      <div className="mt-5 h-px bg-border" />
     </div>
   );
 }

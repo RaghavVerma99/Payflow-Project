@@ -168,13 +168,13 @@ function LivePulse({
   return (
     <div className="relative w-full max-w-[19rem] overflow-hidden rounded-2xl border border-border/80 bg-background/35 p-4 backdrop-blur-sm">
       <div className="flex items-center justify-between">
-        <span className="label-craft">Live pulse</span>
+        <span className="label-craft">Latest activity</span>
         <span className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
           <span className="relative flex size-1.5">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
             <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
           </span>
-          Streaming
+          Live updates
         </span>
       </div>
 
@@ -216,7 +216,7 @@ function LivePulse({
           <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-muted-foreground/70">
             Processor
           </p>
-          <p className="display mt-0.5 text-lg">Nominal</p>
+          <p className="display mt-0.5 text-lg">Simulator</p>
         </div>
       </div>
     </div>
@@ -257,40 +257,35 @@ export function OverviewPage() {
   return (
     <div>
       <Reveal>
-        <Card className="art-card-glow relative overflow-hidden rounded-[30px]">
-          <div className="pointer-events-none absolute -right-24 -top-28 size-[28rem] rounded-full border border-primary/15" />
-          <div className="pointer-events-none absolute -right-10 -top-14 size-[22rem] animate-spin-slow rounded-full border border-dashed border-primary/12" />
-          <div className="pointer-events-none absolute right-40 top-10 size-2 rounded-full bg-primary/70 animate-pulse-soft" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-grid opacity-30 [mask-image:linear-gradient(to_left,black,transparent)]" />
-
-          <div className="relative flex flex-col gap-9 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between lg:p-10">
+        <Card className="relative overflow-hidden border-border shadow-sm">
+          <div className="pointer-events-none absolute right-0 top-0 h-full w-[38%] bg-gradient-to-l from-primary/[0.07] to-transparent" />
+          <div className="relative flex flex-col gap-7 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-2xl flex-1">
               <div className="flex flex-wrap items-center gap-2.5">
                 <Sparkles className="size-3.5 text-primary" />
-                <span className="label-craft">Live operations</span>
+                <span className="label-craft">Payment operations</span>
                 <span className="h-px w-8 bg-border" />
                 <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-muted-foreground/60">
                   {TODAY}
                 </span>
               </div>
-              <h1 className="display mt-5 text-[52px] leading-[0.88] sm:text-[72px]">
-                Money,
+              <h1 className="mt-4 max-w-xl text-[36px] font-semibold leading-[1.05] tracking-[-0.05em] sm:text-[48px]">
+                Payment operations,
                 <br />
-                <span className="italic text-primary">in motion.</span>
+                <span className="text-primary">in clear view.</span>
               </h1>
-              <p className="mt-5 max-w-md text-[13px] leading-relaxed text-muted-foreground">
-                Idempotent by design. Deterministic at the processor. Balanced
-                in the ledger. This is the quiet choreography behind every
-                charge.
+              <p className="mt-4 max-w-lg text-[13px] leading-relaxed text-muted-foreground">
+                Follow each payment from request to settlement, with retries,
+                refunds, and ledger activity in one workspace.
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-2">
                 <Button size="sm" onClick={() => setNewOpen(true)}>
                   <Plus className="size-3.5" />
-                  Compose a payment
+                  Create payment
                 </Button>
                 <Button variant="outline" size="sm" asChild>
                   <Link to="/ledger">
-                    Read the ledger
+                    View ledger
                     <ArrowRight className="size-3.5" />
                   </Link>
                 </Button>
@@ -325,7 +320,7 @@ export function OverviewPage() {
           <CardContent className="flex items-center justify-between gap-4 p-5">
             <div>
               <p className="text-sm font-medium">
-                The dashboard lost its thread.
+                Dashboard data could not be loaded.
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {overviewQuery.error instanceof Error
@@ -402,7 +397,7 @@ export function OverviewPage() {
               <Card className="hover-lift flex h-full flex-col justify-between p-5">
                 <div className="flex items-center gap-2">
                   <RotateCcw className="size-4 text-violet-500" />
-                  <span className="label-craft">Returned</span>
+                  <span className="label-craft">Refunded volume</span>
                 </div>
                 <div>
                   <p className="display mt-4 text-[34px] leading-none">
@@ -436,7 +431,7 @@ export function OverviewPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <Scale className="size-4 text-primary" />
-                    <span className="label-craft">The book</span>
+                    <span className="label-craft">Ledger</span>
                   </div>
                   <Badge
                     variant={overview.ledger.balanced ? "success" : "danger"}
@@ -483,12 +478,12 @@ export function OverviewPage() {
           <Card className="h-full">
             <CardHeader className="flex-row items-start justify-between space-y-0">
               <div>
-                <span className="label-craft">Fourteen days</span>
+                <span className="label-craft">Last 14 days</span>
                 <CardTitle className="mt-2 text-[22px]">
                   The daily flow
                 </CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Settled volume, drawn like a pulse.
+                  Daily successful payment volume.
                 </p>
               </div>
               <div className="text-right">
@@ -513,10 +508,10 @@ export function OverviewPage() {
         <Reveal delay={80}>
           <Card className="flex h-full flex-col">
             <CardHeader>
-              <span className="label-craft">Composition</span>
+              <span className="label-craft">Distribution</span>
               <CardTitle className="mt-2 text-[22px]">Payment mix</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
-                The character of every charge.
+                Payments grouped by current status.
               </p>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col pt-5">
@@ -585,12 +580,12 @@ export function OverviewPage() {
           <Card className="h-full overflow-hidden">
             <CardHeader className="flex-row items-start justify-between space-y-0">
               <div>
-                <span className="label-craft">The feed</span>
+                <span className="label-craft">Activity</span>
                 <CardTitle className="mt-2 text-[22px]">
                   Recent payments
                 </CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Click a line to open its full story.
+                  Select a payment to view its details.
                 </p>
               </div>
               <Button variant="ghost" size="sm" asChild>
@@ -639,9 +634,9 @@ export function OverviewPage() {
 
             {overview && overview.recent_payments.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <p className="display-soft text-lg">An empty ledger awaits.</p>
+                <p className="text-base font-semibold">No payments yet</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Create the first payment to begin the story.
+                  Create a payment to see the full lifecycle in the console.
                 </p>
                 <Button
                   className="mt-4"
@@ -649,7 +644,7 @@ export function OverviewPage() {
                   onClick={() => setNewOpen(true)}
                 >
                   <Plus className="size-3.5" />
-                  Compose a payment
+                  Create payment
                 </Button>
               </div>
             ) : null}
@@ -660,9 +655,9 @@ export function OverviewPage() {
           <Card className="flex h-full flex-col">
             <CardHeader className="flex-row items-start justify-between space-y-0">
               <div>
-                <span className="label-craft">Double entry</span>
+                <span className="label-craft">Accounting</span>
                 <CardTitle className="mt-2 text-[22px]">
-                  Ledger health
+                  Ledger balances
                 </CardTitle>
               </div>
               <Badge variant={overview?.ledger.balanced ? "success" : "danger"}>

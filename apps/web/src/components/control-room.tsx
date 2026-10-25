@@ -31,6 +31,11 @@ interface Tile {
 }
 
 export function ControlRoom() {
+  const overviewQuery = useQuery({
+    queryKey: ["overview"],
+    queryFn: api.overview,
+    refetchInterval: 5000,
+  });
   const query = useQuery({
     queryKey: ["control-room"],
     queryFn: async () => {
@@ -119,14 +124,41 @@ export function ControlRoom() {
     <Card>
       <CardHeader className="flex-row items-start justify-between space-y-0">
         <div>
-          <span className="label-craft">The control room</span>
-          <CardTitle className="mt-2 text-[22px]">Every subsystem</CardTitle>
+          <span className="label-craft">Operations</span>
+          <CardTitle className="mt-2 text-[22px]">System activity</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
             Instruments, delivery, treasury, and claims — in one place.
           </p>
         </div>
         <Badge variant="outline">live</Badge>
       </CardHeader>
+
+      {overviewQuery.data ? (
+        <div className="grid grid-cols-2 gap-2 px-5 pt-4 sm:grid-cols-4">
+          {([
+            ["Queued", overviewQuery.data.jobs.pending ?? 0],
+            ["Retrying", overviewQuery.data.jobs.retrying ?? 0],
+            ["Running", overviewQuery.data.jobs.running ?? 0],
+            ["Dead letters", overviewQuery.data.jobs.dead ?? 0],
+          ] as const).map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-lg border border-border bg-background/50 px-3 py-2.5"
+            >
+              <p className="text-[10px] text-muted-foreground">{label}</p>
+              <p
+                className={`mt-1 text-lg font-semibold tabular-nums ${
+                  label === "Dead letters" && value > 0
+                    ? "text-destructive"
+                    : ""
+                }`}
+              >
+                {value}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <CardContent className="pt-5">
         <div className="grid gap-4 xl:grid-cols-12">

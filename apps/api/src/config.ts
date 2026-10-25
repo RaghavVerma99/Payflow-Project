@@ -69,16 +69,52 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     dbPath: resolveDbPath(process.env.PAYFLOW_DB_PATH),
     apiKeyPepper: process.env.PAYFLOW_API_KEY_PEPPER ?? DEV_PEPPER,
     workerEnabled: bool(process.env.PAYFLOW_WORKER_ENABLED, env !== "test"),
-    workerPollMs: int("PAYFLOW_WORKER_POLL_MS", process.env.PAYFLOW_WORKER_POLL_MS, 400, 10, 60_000),
-    workerLeaseSeconds: int("PAYFLOW_WORKER_LEASE_SECONDS", process.env.PAYFLOW_WORKER_LEASE_SECONDS, 60, 5, 86_400),
-    maxJobAttempts: int("PAYFLOW_MAX_JOB_ATTEMPTS", process.env.PAYFLOW_MAX_JOB_ATTEMPTS, 5, 1, 100),
+    workerPollMs: int(
+      "PAYFLOW_WORKER_POLL_MS",
+      process.env.PAYFLOW_WORKER_POLL_MS,
+      400,
+      10,
+      60_000,
+    ),
+    workerLeaseSeconds: int(
+      "PAYFLOW_WORKER_LEASE_SECONDS",
+      process.env.PAYFLOW_WORKER_LEASE_SECONDS,
+      60,
+      5,
+      86_400,
+    ),
+    maxJobAttempts: int(
+      "PAYFLOW_MAX_JOB_ATTEMPTS",
+      process.env.PAYFLOW_MAX_JOB_ATTEMPTS,
+      5,
+      1,
+      100,
+    ),
     allowSimulatorControls: bool(
       process.env.PAYFLOW_ALLOW_SIMULATOR_CONTROLS,
       env !== "production",
     ),
-    idempotencyTtlHours: int("PAYFLOW_IDEMPOTENCY_TTL_HOURS", process.env.PAYFLOW_IDEMPOTENCY_TTL_HOURS, 24, 0, 8760),
-    defaultPageSize: int("PAYFLOW_DEFAULT_PAGE_SIZE", process.env.PAYFLOW_DEFAULT_PAGE_SIZE, 25, 1, 500),
-    maxPageSize: int("PAYFLOW_MAX_PAGE_SIZE", process.env.PAYFLOW_MAX_PAGE_SIZE, 100, 1, 500),
+    idempotencyTtlHours: int(
+      "PAYFLOW_IDEMPOTENCY_TTL_HOURS",
+      process.env.PAYFLOW_IDEMPOTENCY_TTL_HOURS,
+      24,
+      0,
+      8760,
+    ),
+    defaultPageSize: int(
+      "PAYFLOW_DEFAULT_PAGE_SIZE",
+      process.env.PAYFLOW_DEFAULT_PAGE_SIZE,
+      25,
+      1,
+      500,
+    ),
+    maxPageSize: int(
+      "PAYFLOW_MAX_PAGE_SIZE",
+      process.env.PAYFLOW_MAX_PAGE_SIZE,
+      100,
+      1,
+      500,
+    ),
     corsOrigin:
       env === "production"
         ? (process.env.PAYFLOW_CORS_ORIGIN ?? false)
@@ -95,11 +131,35 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     ...overrides,
   };
 
+  const ranges: Array<[string, number, number, number]> = [
+    ["PAYFLOW_PORT", config.port, 1, 65535],
+    ["PAYFLOW_WORKER_POLL_MS", config.workerPollMs, 10, 60_000],
+    ["PAYFLOW_WORKER_LEASE_SECONDS", config.workerLeaseSeconds, 5, 86_400],
+    ["PAYFLOW_MAX_JOB_ATTEMPTS", config.maxJobAttempts, 1, 100],
+    ["PAYFLOW_IDEMPOTENCY_TTL_HOURS", config.idempotencyTtlHours, 0, 8760],
+    ["PAYFLOW_DEFAULT_PAGE_SIZE", config.defaultPageSize, 1, 500],
+    ["PAYFLOW_MAX_PAGE_SIZE", config.maxPageSize, 1, 500],
+    ["PAYFLOW_RATE_LIMIT_MAX", config.rateLimitMax, 1, 1_000_000],
+  ];
+  for (const [name, value, minimum, maximum] of ranges) {
+    if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+      throw new Error(`${name} must be between ${minimum} and ${maximum}.`);
+    }
+  }
+
   if (config.defaultPageSize > config.maxPageSize) {
-    throw new Error("PAYFLOW_DEFAULT_PAGE_SIZE cannot exceed PAYFLOW_MAX_PAGE_SIZE.");
+    throw new Error(
+      "PAYFLOW_DEFAULT_PAGE_SIZE cannot exceed PAYFLOW_MAX_PAGE_SIZE.",
+    );
   }
 
   if (config.env === "production") {
+    const origins = Array.isArray(config.corsOrigin)
+      ? config.corsOrigin
+      : [config.corsOrigin];
+    if (origins.includes(true) || origins.includes("*")) {
+      throw new Error("Production CORS must use an explicit origin.");
+    }
     if (config.apiKeyPepper === DEV_PEPPER) {
       throw new Error("PAYFLOW_API_KEY_PEPPER must be set in production");
     }

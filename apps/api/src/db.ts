@@ -25,9 +25,7 @@ function migrateRefundStatus(sqlite: Database.Database): void {
 
   if (!table || table.sql.includes("'unknown'")) return;
 
-  try {
-    sqlite.exec(`
-      BEGIN IMMEDIATE;
+  sqlite.exec(`
       CREATE TABLE refunds_migrated (
         id TEXT PRIMARY KEY,
         payment_id TEXT NOT NULL REFERENCES payments(id),
@@ -54,14 +52,7 @@ function migrateRefundStatus(sqlite: Database.Database): void {
       ALTER TABLE refunds_migrated RENAME TO refunds;
       CREATE INDEX IF NOT EXISTS ix_refunds_payment_status ON refunds(payment_id, status);
       CREATE INDEX IF NOT EXISTS ix_refunds_merchant ON refunds(merchant_id, created_at);
-      COMMIT;
     `);
-  } catch (error) {
-    try {
-      sqlite.exec("ROLLBACK;");
-    } catch {}
-    throw error;
-  }
 }
 
 function tableColumns(sqlite: Database.Database, table: string): string[] {
@@ -93,6 +84,22 @@ function migrateColumns(sqlite: Database.Database): void {
   );
 }
 
+interface Migration {
+  version: number;
+  apply: (sqlite: Database.Database) => void;
+}
+
+const MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    apply(sqlite) {
+      sqlite.exec(SCHEMA_SQL);
+      migrateRefundStatus(sqlite);
+      migrateColumns(sqlite);
+    },
+  },
+];
+
 export function createDb(dbPath: string): DbHandle {
   if (dbPath !== ":memory:") {
     mkdirSync(dirname(dbPath), { recursive: true });
@@ -108,19 +115,22 @@ export function createDb(dbPath: string): DbHandle {
     applied_at TEXT NOT NULL
   );`);
 
-  const applied = sqlite
-    .prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations")
+  const appliedVersion = sqlite
+    .prepare(
+      "SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations",
+    )
     .get() as { version: number };
 
-  // Version 1 adopts an existing PayFlow database as well as initializing a new one.
-  // Keep subsequent schema changes as ordered, one-way migrations below.
-  if (applied.version < 1) {
-    sqlite.exec(SCHEMA_SQL);
-    migrateRefundStatus(sqlite);
-    migrateColumns(sqlite);
-    sqlite
-      .prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)")
-      .run(1, new Date().toISOString());
+  for (const migration of MIGRATIONS) {
+    if (migration.version <= appliedVersion.version) continue;
+    sqlite.transaction(() => {
+      migration.apply(sqlite);
+      sqlite
+        .prepare(
+          "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+        )
+        .run(migration.version, new Date().toISOString());
+    }).immediate();
   }
 
   const db = drizzle(sqlite, { schema });
