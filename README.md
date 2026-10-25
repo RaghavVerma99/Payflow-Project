@@ -22,7 +22,7 @@ The seed command creates sample merchants, activity, and a development API key a
 
 - Merchant-scoped API keys, request validation, consistent errors, and OpenAPI documentation
 - Idempotent payment, refund, and payout requests
-- Deterministic processor outcomes, job leases, retries, dead letters, and reconciliation
+- Deterministic processor outcomes, job leases, retries, dead letters, reconciliation, and safe dead-job replay
 - Immutable double-entry journals, balance-bounded payouts, and dispute accounting
 - Tokenized payment method metadata; card numbers are not accepted or stored
 - Transactional webhook outbox, HMAC signatures, delivery history, and retry

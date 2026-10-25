@@ -121,16 +121,29 @@ export function createDb(dbPath: string): DbHandle {
     )
     .get() as { version: number };
 
-  for (const migration of MIGRATIONS) {
-    if (migration.version <= appliedVersion.version) continue;
-    sqlite.transaction(() => {
-      migration.apply(sqlite);
-      sqlite
-        .prepare(
-          "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
-        )
-        .run(migration.version, new Date().toISOString());
-    }).immediate();
+  const latestVersion = MIGRATIONS.at(-1)?.version ?? 0;
+  if (appliedVersion.version > latestVersion) {
+    sqlite.close();
+    throw new Error(
+      `Database schema version ${appliedVersion.version} is newer than this application supports (${latestVersion}).`,
+    );
+  }
+
+  try {
+    for (const migration of MIGRATIONS) {
+      if (migration.version <= appliedVersion.version) continue;
+      sqlite.transaction(() => {
+        migration.apply(sqlite);
+        sqlite
+          .prepare(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+          )
+          .run(migration.version, new Date().toISOString());
+      }).immediate();
+    }
+  } catch (error) {
+    sqlite.close();
+    throw error;
   }
 
   const db = drizzle(sqlite, { schema });

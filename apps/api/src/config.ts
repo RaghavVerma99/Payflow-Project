@@ -55,8 +55,20 @@ function int(
 }
 
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
-  const rawEnv = overrides.env ?? process.env.PAYFLOW_ENV ??
-    (process.env.NODE_ENV === "test" ? "test" : "dev");
+  const nodeEnvironment = process.env.NODE_ENV;
+  const defaultEnvironment =
+    nodeEnvironment === "test"
+      ? "test"
+      : nodeEnvironment === "production"
+        ? "production"
+        : "dev";
+  const rawEnv =
+    overrides.env ?? process.env.PAYFLOW_ENV ?? defaultEnvironment;
+  if (nodeEnvironment === "production" && rawEnv !== "production") {
+    throw new Error(
+      "PAYFLOW_ENV must be production when NODE_ENV is production.",
+    );
+  }
   if (!["dev", "test", "production"].includes(rawEnv)) {
     throw new Error("PAYFLOW_ENV must be dev, test, or production.");
   }
@@ -160,7 +172,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     if (origins.includes(true) || origins.includes("*")) {
       throw new Error("Production CORS must use an explicit origin.");
     }
-    if (config.apiKeyPepper === DEV_PEPPER) {
+    if (!config.apiKeyPepper.trim() || config.apiKeyPepper === DEV_PEPPER) {
       throw new Error("PAYFLOW_API_KEY_PEPPER must be set in production");
     }
     if (config.allowSimulatorControls) {

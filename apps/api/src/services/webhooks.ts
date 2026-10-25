@@ -441,7 +441,10 @@ export async function deliverToEndpoint(
         status: "failed",
         responseStatus: response.status,
         responseBody: text.slice(0, 500),
-        error: `Endpoint responded with ${response.status}; redirects are not followed.`,
+        error:
+          response.status >= 300 && response.status < 400
+            ? `Endpoint redirected with ${response.status}; redirects are not followed.`
+            : `Endpoint responded with ${response.status}.`,
       };
     }
 

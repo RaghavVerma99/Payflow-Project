@@ -269,6 +269,34 @@ export interface Overview {
   recent_payments: Payment[];
 }
 
+export interface Job {
+  id: string;
+  kind: string;
+  aggregate_id: string | null;
+  status:
+    | "pending"
+    | "retrying"
+    | "running"
+    | "succeeded"
+    | "dead"
+    | "canceled";
+  attempts: number;
+  max_attempts: number;
+  next_run_at: string;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobsResponse {
+  data: Job[];
+  summary: {
+    by_status: Record<string, number>;
+    oldest_active_at: string | null;
+    oldest_active_age_seconds: number | null;
+  };
+}
+
 export interface TimeseriesPoint {
   date: string;
   payments: number;
@@ -599,6 +627,11 @@ export const api = {
     ),
 
   capabilities: () => request<Capabilities>("/v1"),
+
+  jobs: (params?: { limit?: number; status?: Job["status"] }) =>
+    request<JobsResponse>(`/v1/jobs${queryString(params ?? {})}`),
+  retryJob: (id: string) =>
+    request<Job>(`/v1/jobs/${id}/retry`, { method: "POST" }),
 
   apiKeys: () => request<{ data: ApiKey[] }>("/v1/api_keys"),
   createApiKey: (name?: string | null) =>

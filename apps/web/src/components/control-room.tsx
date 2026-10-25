@@ -1,18 +1,21 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   Landmark,
   Radio,
+  RotateCcw,
   Scale,
   Wallet,
   Webhook,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { api } from "../lib/api";
 import { formatCurrency, relativeTime } from "../lib/utils";
 import { StatusBadge } from "./status";
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -31,10 +34,21 @@ interface Tile {
 }
 
 export function ControlRoom() {
-  const overviewQuery = useQuery({
-    queryKey: ["overview"],
-    queryFn: api.overview,
+  const queryClient = useQueryClient();
+  const jobsQuery = useQuery({
+    queryKey: ["jobs", "dead"],
+    queryFn: () => api.jobs({ limit: 8, status: "dead" }),
     refetchInterval: 5000,
+  });
+  const retryJobMutation = useMutation({
+    mutationFn: api.retryJob,
+    onSuccess: () => {
+      toast.success("Job queued for retry.");
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      void queryClient.invalidateQueries({ queryKey: ["overview"] });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Retry failed."),
   });
   const query = useQuery({
     queryKey: ["control-room"],
@@ -133,13 +147,13 @@ export function ControlRoom() {
         <Badge variant="outline">live</Badge>
       </CardHeader>
 
-      {overviewQuery.data ? (
+      {jobsQuery.data ? (
         <div className="grid grid-cols-2 gap-2 px-5 pt-4 sm:grid-cols-4">
           {([
-            ["Queued", overviewQuery.data.jobs.pending ?? 0],
-            ["Retrying", overviewQuery.data.jobs.retrying ?? 0],
-            ["Running", overviewQuery.data.jobs.running ?? 0],
-            ["Dead letters", overviewQuery.data.jobs.dead ?? 0],
+            ["Queued", jobsQuery.data.summary.by_status.pending ?? 0],
+            ["Retrying", jobsQuery.data.summary.by_status.retrying ?? 0],
+            ["Running", jobsQuery.data.summary.by_status.running ?? 0],
+            ["Dead letters", jobsQuery.data.summary.by_status.dead ?? 0],
           ] as const).map(([label, value]) => (
             <div
               key={label}
@@ -157,6 +171,46 @@ export function ControlRoom() {
               </p>
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {jobsQuery.data ? (
+        <div className="px-5 pt-3">
+          <p className="text-[10px] text-muted-foreground">
+            Oldest active job:{" "}
+            {ageLabel(jobsQuery.data.summary.oldest_active_age_seconds)}
+          </p>
+          {jobsQuery.data.data.length > 0 ? (
+            <div className="mt-3 divide-y divide-border rounded-lg border border-border">
+              {jobsQuery.data.data.map((job) => (
+                <div
+                  key={job.id}
+                  className="flex flex-wrap items-center gap-3 px-3 py-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-medium">
+                      {job.kind.replaceAll("_", " ")}
+                    </p>
+                    <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                      {job.last_error ?? "Retry budget exhausted"}
+                    </p>
+                  </div>
+                  <span className="font-mono text-[9px] text-muted-foreground">
+                    {job.attempts}/{job.max_attempts} attempts
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={retryJobMutation.isPending}
+                    onClick={() => retryJobMutation.mutate(job.id)}
+                  >
+                    <RotateCcw className="size-3" />
+                    Retry
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -232,4 +286,12 @@ export function ControlRoom() {
       </CardContent>
     </Card>
   );
+}
+
+function ageLabel(ageSeconds: number | null): string {
+  if (ageSeconds === null) return "none";
+  if (ageSeconds < 60) return `${ageSeconds}s`;
+  if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}m`;
+  const hours = Math.floor(ageSeconds / 3600);
+  return `${hours}h ${Math.floor((ageSeconds % 3600) / 60)}m`;
 }

@@ -2,7 +2,7 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { payments, refunds } from "../schema";
 import { accountSummaries, trialBalance, type AccountSummary } from "./ledger";
-import { jobStatusCounts } from "./jobs";
+import { merchantJobSummary } from "./jobs";
 import { serializePayment, type PaymentView } from "./serializers";
 
 const SUCCESSFUL = ["succeeded", "partially_refunded", "refunded"] as const;
@@ -137,7 +137,7 @@ export function overview(
       credits_minor: trial.credits_minor,
       accounts,
     },
-    jobs: jobStatusCounts(db),
+    jobs: merchantJobSummary(db, merchant.id).by_status,
     recent_payments: recent.map(serializePayment),
   };
 }
