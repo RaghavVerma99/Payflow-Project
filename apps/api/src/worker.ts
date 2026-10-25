@@ -885,7 +885,13 @@ async function deliverWebhook(
   for (const endpoint of endpoints) {
     if (delivered.has(endpoint.id)) continue;
 
-    const result = await deliverToEndpoint(endpoint, event, attempt);
+    const result = await deliverToEndpoint(
+      endpoint,
+      event,
+      attempt,
+      4000,
+      ctx.config.env !== "production",
+    );
     recordDelivery(ctx.db, { event, attempt, result });
 
     if (result.status === "failed") {

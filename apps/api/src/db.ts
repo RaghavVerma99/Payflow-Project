@@ -103,9 +103,25 @@ export function createDb(dbPath: string): DbHandle {
   sqlite.pragma("foreign_keys = ON");
   sqlite.pragma("busy_timeout = 30000");
   sqlite.pragma("synchronous = NORMAL");
-  sqlite.exec(SCHEMA_SQL);
-  migrateRefundStatus(sqlite);
-  migrateColumns(sqlite);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    version INTEGER PRIMARY KEY,
+    applied_at TEXT NOT NULL
+  );`);
+
+  const applied = sqlite
+    .prepare("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations")
+    .get() as { version: number };
+
+  // Version 1 adopts an existing PayFlow database as well as initializing a new one.
+  // Keep subsequent schema changes as ordered, one-way migrations below.
+  if (applied.version < 1) {
+    sqlite.exec(SCHEMA_SQL);
+    migrateRefundStatus(sqlite);
+    migrateColumns(sqlite);
+    sqlite
+      .prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)")
+      .run(1, new Date().toISOString());
+  }
 
   const db = drizzle(sqlite, { schema });
 
