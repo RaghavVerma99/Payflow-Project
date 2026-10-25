@@ -149,12 +149,14 @@ export function ControlRoom() {
 
       {jobsQuery.data ? (
         <div className="grid grid-cols-2 gap-2 px-5 pt-4 sm:grid-cols-4">
-          {([
-            ["Queued", jobsQuery.data.summary.by_status.pending ?? 0],
-            ["Retrying", jobsQuery.data.summary.by_status.retrying ?? 0],
-            ["Running", jobsQuery.data.summary.by_status.running ?? 0],
-            ["Dead letters", jobsQuery.data.summary.by_status.dead ?? 0],
-          ] as const).map(([label, value]) => (
+          {(
+            [
+              ["Queued", jobsQuery.data.summary.by_status.pending ?? 0],
+              ["Retrying", jobsQuery.data.summary.by_status.retrying ?? 0],
+              ["Running", jobsQuery.data.summary.by_status.running ?? 0],
+              ["Dead letters", jobsQuery.data.summary.by_status.dead ?? 0],
+            ] as const
+          ).map(([label, value]) => (
             <div
               key={label}
               className="rounded-lg border border-border bg-background/50 px-3 py-2.5"

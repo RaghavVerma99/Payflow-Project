@@ -62,8 +62,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       : nodeEnvironment === "production"
         ? "production"
         : "dev";
-  const rawEnv =
-    overrides.env ?? process.env.PAYFLOW_ENV ?? defaultEnvironment;
+  const rawEnv = overrides.env ?? process.env.PAYFLOW_ENV ?? defaultEnvironment;
   if (nodeEnvironment === "production" && rawEnv !== "production") {
     throw new Error(
       "PAYFLOW_ENV must be production when NODE_ENV is production.",

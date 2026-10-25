@@ -331,10 +331,7 @@ export function merchantJobSummary(
     .select({ createdAt: jobs.createdAt })
     .from(jobs)
     .where(
-      and(
-        condition,
-        inArray(jobs.status, ["pending", "retrying", "running"]),
-      ),
+      and(condition, inArray(jobs.status, ["pending", "retrying", "running"])),
     )
     .orderBy(asc(jobs.createdAt), asc(jobs.id))
     .limit(1)

@@ -121,7 +121,8 @@
     font-synthesis-weight: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
-    background-image: linear-gradient(135deg, var(--glow-a), transparent 42%),
+    background-image:
+      linear-gradient(135deg, var(--glow-a), transparent 42%),
       linear-gradient(320deg, var(--glow-b), transparent 40%);
   }
 

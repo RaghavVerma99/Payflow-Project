@@ -9,7 +9,12 @@ export type PaymentStatus =
   | "refunded";
 
 export type RefundStatus =
-  "reserved" | "processing" | "succeeded" | "failed" | "canceled" | "unknown";
+  | "reserved"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "canceled"
+  | "unknown";
 
 export type Scenario = "auto" | "approve" | "decline" | "timeout" | "transient";
 

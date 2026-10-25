@@ -132,14 +132,16 @@ export function createDb(dbPath: string): DbHandle {
   try {
     for (const migration of MIGRATIONS) {
       if (migration.version <= appliedVersion.version) continue;
-      sqlite.transaction(() => {
-        migration.apply(sqlite);
-        sqlite
-          .prepare(
-            "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
-          )
-          .run(migration.version, new Date().toISOString());
-      }).immediate();
+      sqlite
+        .transaction(() => {
+          migration.apply(sqlite);
+          sqlite
+            .prepare(
+              "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+            )
+            .run(migration.version, new Date().toISOString());
+        })
+        .immediate();
     }
   } catch (error) {
     sqlite.close();

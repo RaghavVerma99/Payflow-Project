@@ -113,7 +113,9 @@ export function isPrivateHost(hostname: string): boolean {
     const octets = host.split(".").map(Number);
     const [a, b, c] = octets;
     return (
-      a === 0 || a === 10 || a === 127 ||
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
       (a === 100 && b >= 64 && b <= 127) ||
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
@@ -132,16 +134,13 @@ export function isPrivateHost(hostname: string): boolean {
   const first = Number.parseInt(expanded.slice(0, 4), 16);
   const address = BigInt(`0x${expanded}`);
   const inRange = (prefix: bigint, bits: number) =>
-    address >> BigInt(128 - bits) ===
-    prefix >> BigInt(128 - bits);
+    address >> BigInt(128 - bits) === prefix >> BigInt(128 - bits);
   if (address === 0n || address === 1n) return true;
   if ((first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80) return true;
   if ((first & 0xff00) === 0xff00) return true;
   if (!inRange(0x2000n << 112n, 3)) return true;
-  if (
-    inRange(0x20010db8n << 96n, 32) ||
-    inRange(0x20010000n << 96n, 23)
-  ) return true;
+  if (inRange(0x20010db8n << 96n, 32) || inRange(0x20010000n << 96n, 23))
+    return true;
   return false;
 }
 
@@ -149,11 +148,11 @@ function expandIpv6(host: string): string | null {
   let value = host;
   if (value.includes(".")) {
     const split = value.lastIndexOf(":");
-    const octets = value.slice(split + 1).split(".").map(Number);
-    if (
-      octets.length !== 4 ||
-      octets.some((part) => part < 0 || part > 255)
-    ) {
+    const octets = value
+      .slice(split + 1)
+      .split(".")
+      .map(Number);
+    if (octets.length !== 4 || octets.some((part) => part < 0 || part > 255)) {
       return null;
     }
     const upper = ((octets[0] << 8) | octets[1]).toString(16);
@@ -176,11 +175,17 @@ function expandIpv6(host: string): string | null {
   return groups.map((group) => group.padStart(4, "0")).join("");
 }
 
-async function destinationAddress(hostname: string, allowPrivateHosts: boolean) {
+async function destinationAddress(
+  hostname: string,
+  allowPrivateHosts: boolean,
+) {
   const normalized = hostname.replace(/^\[|\]$/g, "");
   const addresses = await lookup(normalized, { all: true, verbatim: true });
   if (addresses.length === 0) throw new Error("Webhook host did not resolve.");
-  if (!allowPrivateHosts && addresses.some(({ address }) => isPrivateHost(address))) {
+  if (
+    !allowPrivateHosts &&
+    addresses.some(({ address }) => isPrivateHost(address))
+  ) {
     throw new Error("Webhook host resolved to a private or reserved address.");
   }
   return addresses[0];
@@ -195,33 +200,39 @@ async function postPinned(
 ): Promise<{ status: number; body: string }> {
   const transport = target.protocol === "https:" ? https : http;
   return new Promise((resolve, reject) => {
-    const request = transport.request(target, {
-      method: "POST",
-      headers,
-      servername:
-        target.protocol === "https:" && isIP(target.hostname) === 0
-          ? target.hostname
-          : undefined,
-      lookup: (_hostname, _options, callback) =>
-        callback(null, address.address, address.family),
-    }, (response) => {
-      const chunks: Buffer[] = [];
-      let size = 0;
-      response.on("data", (chunk: Buffer | string) => {
-        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        if (size + buffer.length > 4096) {
-          response.destroy(new Error("Webhook response exceeded 4 KB."));
-          return;
-        }
-        chunks.push(buffer);
-        size += buffer.length;
-      });
-      response.on("end", () => resolve({
-        status: response.statusCode ?? 0,
-        body: Buffer.concat(chunks).toString("utf8"),
-      }));
-      response.on("error", reject);
-    });
+    const request = transport.request(
+      target,
+      {
+        method: "POST",
+        headers,
+        servername:
+          target.protocol === "https:" && isIP(target.hostname) === 0
+            ? target.hostname
+            : undefined,
+        lookup: (_hostname, _options, callback) =>
+          callback(null, address.address, address.family),
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        response.on("data", (chunk: Buffer | string) => {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          if (size + buffer.length > 4096) {
+            response.destroy(new Error("Webhook response exceeded 4 KB."));
+            return;
+          }
+          chunks.push(buffer);
+          size += buffer.length;
+        });
+        response.on("end", () =>
+          resolve({
+            status: response.statusCode ?? 0,
+            body: Buffer.concat(chunks).toString("utf8"),
+          }),
+        );
+        response.on("error", reject);
+      },
+    );
     const timer = setTimeout(
       () => request.destroy(new Error("Webhook request timed out.")),
       timeoutMs,
@@ -418,7 +429,10 @@ export async function deliverToEndpoint(
     if (target.protocol !== "http:" && target.protocol !== "https:") {
       throw new Error("Webhook url must use http or https.");
     }
-    const address = await destinationAddress(target.hostname, allowPrivateHosts);
+    const address = await destinationAddress(
+      target.hostname,
+      allowPrivateHosts,
+    );
     const response = await postPinned(
       target,
       address,

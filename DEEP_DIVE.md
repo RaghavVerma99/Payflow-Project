@@ -1057,22 +1057,22 @@ flowchart LR
 
 ### Decision table
 
-| I want to…                  | Touch                                                                                  | Watch out for                                                              |
-| --------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Add a payment status        | `domain.ts` (`PAYMENT_STATUSES`, `ALLOWED_TRANSITIONS`), `schemas.ts`, `schema-sql.ts`, `db.ts` | Add a numbered migration to update the DB `CHECK` for existing files |
-| Add a refund status         | `REFUND_STATUSES`, `schema-sql.ts` (`refunds`), `web/src/lib/api.ts`                   | `unknown` must be allowed in the `refunds` CHECK                           |
-| Add an endpoint             | `routes/*.ts` + a service function                                                     | Zod request _and_ response schemas; `preHandler: [app.authenticate]`       |
-| Change a response field     | `services/serializers.ts`, `schemas.ts`, `web/src/lib/api.ts`                          | The web client type changes in the same commit                             |
-| Change the ledger           | `services/ledger.ts`                                                                   | Journals must stay balanced; entries are immutable                         |
-| Change retry behaviour      | `services/jobs.ts`, `domain.ts` (`backoffSeconds`), `config.ts`                        | One source of truth for the formula                                        |
-| Add a simulator scenario    | `domain.ts` (`SCENARIOS`, `runSimulation`), `web/src/lib/api.ts`, playground presets   | Production keeps simulator controls off                                    |
-| Add a console page          | `pages/*.tsx`, `App.tsx`, `layout.tsx` (`NAV` + `TITLES`)                              | Add a title or the header shows "PayFlow"                                  |
-| Add a payment method        | `services/payment-methods.ts`, `routes/methods.ts`                                     | A card needs a four-digit `last4`; there is no PAN field                   |
-| Add a webhook event         | `domain.ts` (`WEBHOOK_EVENT_TYPES`), `services/webhooks.ts`                            | Emit it inside the business transaction, never after                       |
-| Change the webhook contract | `services/webhooks.ts` (`signPayload`, payload shape)                                  | The signature covers `timestamp.body`; changing it breaks receivers        |
-| Add a payout rule           | `services/payouts.ts`, `services/ledger.ts`                                            | Payouts post journals through the ledger service                           |
-| Add a dispute rule          | `services/disputes.ts`, `services/ledger.ts`                                           | A lost dispute posts a reversing journal; a won dispute posts nothing      |
-| Add a report                | `services/reports.ts`, `routes/platform.ts`                                            | Amounts stay integer minor units; the CSV export mirrors the JSON          |
+| I want to…                  | Touch                                                                                           | Watch out for                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Add a payment status        | `domain.ts` (`PAYMENT_STATUSES`, `ALLOWED_TRANSITIONS`), `schemas.ts`, `schema-sql.ts`, `db.ts` | Add a numbered migration to update the DB `CHECK` for existing files  |
+| Add a refund status         | `REFUND_STATUSES`, `schema-sql.ts` (`refunds`), `web/src/lib/api.ts`                            | `unknown` must be allowed in the `refunds` CHECK                      |
+| Add an endpoint             | `routes/*.ts` + a service function                                                              | Zod request _and_ response schemas; `preHandler: [app.authenticate]`  |
+| Change a response field     | `services/serializers.ts`, `schemas.ts`, `web/src/lib/api.ts`                                   | The web client type changes in the same commit                        |
+| Change the ledger           | `services/ledger.ts`                                                                            | Journals must stay balanced; entries are immutable                    |
+| Change retry behaviour      | `services/jobs.ts`, `domain.ts` (`backoffSeconds`), `config.ts`                                 | One source of truth for the formula                                   |
+| Add a simulator scenario    | `domain.ts` (`SCENARIOS`, `runSimulation`), `web/src/lib/api.ts`, playground presets            | Production keeps simulator controls off                               |
+| Add a console page          | `pages/*.tsx`, `App.tsx`, `layout.tsx` (`NAV` + `TITLES`)                                       | Add a title or the header shows "PayFlow"                             |
+| Add a payment method        | `services/payment-methods.ts`, `routes/methods.ts`                                              | A card needs a four-digit `last4`; there is no PAN field              |
+| Add a webhook event         | `domain.ts` (`WEBHOOK_EVENT_TYPES`), `services/webhooks.ts`                                     | Emit it inside the business transaction, never after                  |
+| Change the webhook contract | `services/webhooks.ts` (`signPayload`, payload shape)                                           | The signature covers `timestamp.body`; changing it breaks receivers   |
+| Add a payout rule           | `services/payouts.ts`, `services/ledger.ts`                                                     | Payouts post journals through the ledger service                      |
+| Add a dispute rule          | `services/disputes.ts`, `services/ledger.ts`                                                    | A lost dispute posts a reversing journal; a won dispute posts nothing |
+| Add a report                | `services/reports.ts`, `routes/platform.ts`                                                     | Amounts stay integer minor units; the CSV export mirrors the JSON     |
 
 ### Change recipes
 
