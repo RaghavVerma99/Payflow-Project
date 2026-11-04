@@ -55,10 +55,7 @@ export function committedMinorByPayment(
   return new Map(rows.map((row) => [row.paymentId, Number(row.total)]));
 }
 
-export function paymentCapacity(
-  db: Db,
-  payment: PaymentRow,
-): PaymentCapacity {
+export function paymentCapacity(db: Db, payment: PaymentRow): PaymentCapacity {
   const disputed = committedMinor(db, payment.id);
   const committed =
     payment.refundedMinor + payment.refundReservedMinor + disputed;

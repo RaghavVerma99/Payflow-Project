@@ -9,12 +9,7 @@ export type PaymentStatus =
   | "refunded";
 
 export type RefundStatus =
-  | "reserved"
-  | "processing"
-  | "succeeded"
-  | "failed"
-  | "canceled"
-  | "unknown";
+  "reserved" | "processing" | "succeeded" | "failed" | "canceled" | "unknown";
 
 export type Scenario = "auto" | "approve" | "decline" | "timeout" | "transient";
 
@@ -285,12 +280,7 @@ export interface Job {
   kind: string;
   aggregate_id: string | null;
   status:
-    | "pending"
-    | "retrying"
-    | "running"
-    | "succeeded"
-    | "dead"
-    | "canceled";
+    "pending" | "retrying" | "running" | "succeeded" | "dead" | "canceled";
   attempts: number;
   max_attempts: number;
   next_run_at: string;

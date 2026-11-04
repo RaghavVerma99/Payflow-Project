@@ -331,12 +331,7 @@ function merchantJobCondition(db: Db, merchantId: string) {
 }
 
 export type MerchantJobStatus =
-  | "pending"
-  | "retrying"
-  | "running"
-  | "succeeded"
-  | "dead"
-  | "canceled";
+  "pending" | "retrying" | "running" | "succeeded" | "dead" | "canceled";
 
 export interface MerchantJob {
   id: string;

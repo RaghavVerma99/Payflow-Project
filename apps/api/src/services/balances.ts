@@ -49,10 +49,7 @@ export function payoutAvailability(
     })
     .from(disputes)
     .where(
-      and(
-        eq(disputes.merchantId, merchantId),
-        eq(disputes.status, "open"),
-      ),
+      and(eq(disputes.merchantId, merchantId), eq(disputes.status, "open")),
     )
     .get();
 
