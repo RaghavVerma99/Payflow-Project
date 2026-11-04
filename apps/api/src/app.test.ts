@@ -988,6 +988,51 @@ describe("payouts", () => {
     expect(response.json().error.code).toBe("insufficient_balance");
   });
 
+  it("holds pending payouts against new payouts and reports availability", async () => {
+    await createPayment({
+      amount_minor: 10_000,
+      simulator_scenario: "approve",
+    });
+    await drain();
+
+    const first = await app.inject({
+      method: "POST",
+      url: "/v1/payouts",
+      headers: auth(),
+      payload: { amount_minor: 6_000, destination: "bank://acme" },
+    });
+    expect(first.statusCode).toBe(202);
+    expect(first.json().status).toBe("pending");
+
+    const accounts = (
+      await app.inject({ method: "GET", url: "/v1/accounts", headers: auth() })
+    ).json();
+    expect(accounts.payout_availability).toEqual({
+      payable_minor: 10_000,
+      pending_payouts_minor: 6_000,
+      refunds_in_flight_minor: 0,
+      open_disputes_minor: 0,
+      available_minor: 4_000,
+    });
+
+    const tooLarge = await app.inject({
+      method: "POST",
+      url: "/v1/payouts",
+      headers: auth(),
+      payload: { amount_minor: 5_000, destination: "bank://acme" },
+    });
+    expect(tooLarge.statusCode).toBe(409);
+    expect(tooLarge.json().error.code).toBe("insufficient_balance");
+
+    const remainder = await app.inject({
+      method: "POST",
+      url: "/v1/payouts",
+      headers: auth(),
+      payload: { amount_minor: 4_000, destination: "bank://acme" },
+    });
+    expect(remainder.statusCode).toBe(202);
+  });
+
   it("pays out and moves money to the merchant bank account", async () => {
     await createPayment({ simulator_scenario: "approve" });
     await drain();
@@ -1054,6 +1099,47 @@ describe("payouts", () => {
     );
     expect(clearing.balance_minor).toBe(24_900);
     expect(accounts.trial_balance.balanced).toBe(true);
+  });
+});
+
+describe("dead-letter recovery", () => {
+  it("flags the resource when a job dies and clears it on retry", async () => {
+    const created = (
+      await createPayment({ simulator_scenario: "transient" })
+    ).json();
+
+    app.sqlite
+      .prepare(
+        "update jobs set max_attempts = 1 where kind = 'process_payment' and aggregate_id = ?",
+      )
+      .run(created.id);
+
+    await drain();
+
+    const job = app.sqlite
+      .prepare(
+        "select id, status from jobs where kind = 'process_payment' and aggregate_id = ?",
+      )
+      .get(created.id) as { id: string; status: string };
+    expect(job.status).toBe("dead");
+
+    const flagged = (await getPayment(created.id)).json();
+    expect(flagged.requires_attention).toBe(true);
+    expect(flagged.attention_reason).toContain("exhausted");
+
+    const retried = await app.inject({
+      method: "POST",
+      url: `/v1/jobs/${job.id}/retry`,
+      headers: auth(),
+    });
+    expect(retried.statusCode).toBe(200);
+
+    const cleared = (await getPayment(created.id)).json();
+    expect(cleared.requires_attention).toBe(false);
+    expect(cleared.attention_reason).toBeNull();
+
+    await drain();
+    expect((await getPayment(created.id)).json().status).toBe("succeeded");
   });
 });
 
@@ -1148,6 +1234,86 @@ describe("disputes", () => {
       (account: { code: string }) => account.code === "merchant_payable",
     );
     expect(payable.balance_minor).toBe(24_900);
+  });
+
+  it("shares remediation capacity between refunds and disputes", async () => {
+    const created = (
+      await createPayment({ simulator_scenario: "approve" })
+    ).json();
+    await drain();
+
+    const dispute = await app.inject({
+      method: "POST",
+      url: "/v1/disputes",
+      headers: auth(),
+      payload: {
+        payment_id: created.id,
+        amount_minor: 10_000,
+        reason: "customer claims not received",
+      },
+    });
+    expect(dispute.statusCode).toBe(201);
+
+    const overRefund = await createRefund({
+      payment_id: created.id,
+      amount_minor: 20_000,
+    });
+    expect(overRefund.statusCode).toBe(409);
+    expect(overRefund.json().error.code).toBe("refund_exceeds_remaining");
+
+    const refund = await createRefund({ payment_id: created.id });
+    expect(refund.statusCode).toBe(202);
+    expect(refund.json().amount_minor).toBe(14_900);
+
+    const accounts = (
+      await app.inject({ method: "GET", url: "/v1/accounts", headers: auth() })
+    ).json();
+    expect(accounts.payout_availability).toMatchObject({
+      refunds_in_flight_minor: 14_900,
+      open_disputes_minor: 10_000,
+      available_minor: 0,
+    });
+
+    const overDispute = await app.inject({
+      method: "POST",
+      url: "/v1/disputes",
+      headers: auth(),
+      payload: {
+        payment_id: created.id,
+        amount_minor: 1,
+        reason: "second claim",
+      },
+    });
+    expect(overDispute.statusCode).toBe(409);
+    expect(overDispute.json().error.code).toBe("dispute_exceeds_remaining");
+
+    await drain();
+    const settled = (await getPayment(created.id)).json();
+    expect(settled.refunded_minor).toBe(14_900);
+    expect(settled.refund_reserved_minor).toBe(0);
+    expect(settled.refundable_minor).toBe(0);
+
+    await app.inject({
+      method: "POST",
+      url: `/v1/disputes/${dispute.json().id}/resolve`,
+      headers: auth(),
+      payload: { outcome: "won" },
+    });
+
+    const released = (await getPayment(created.id)).json();
+    expect(released.refundable_minor).toBe(10_000);
+
+    const replacement = await app.inject({
+      method: "POST",
+      url: "/v1/disputes",
+      headers: auth(),
+      payload: {
+        payment_id: created.id,
+        amount_minor: 10_000,
+        reason: "replacement claim",
+      },
+    });
+    expect(replacement.statusCode).toBe(201);
   });
 });
 

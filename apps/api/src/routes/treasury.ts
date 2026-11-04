@@ -33,7 +33,7 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ["Treasury"],
         summary: "Create a payout",
         description:
-          "Moves money out of the merchant payable balance and into the merchant bank account. Rejected when the payable balance is insufficient.",
+          "Moves money out of the merchant's available balance and into the merchant bank account. Rejected when pending payouts, refunds in flight, or open disputes reduce availability below the requested amount.",
         body: CreatePayoutBody,
         response: {
           202: PayoutSchema,

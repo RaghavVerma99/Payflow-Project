@@ -10,6 +10,7 @@ import {
   type Page,
 } from "../domain";
 import { disputeJournalLines, postJournal } from "./ledger";
+import { paymentCapacity } from "./payment-capacity";
 import { emitWebhookEvent } from "./webhooks";
 
 export interface CreateDisputeInput {
@@ -41,14 +42,13 @@ export function createDispute(db: Db, input: CreateDisputeInput): DisputeRow {
         throw errors.paymentNotDisputable();
       }
 
-      const amount = input.amountMinor ?? payment.amountMinor;
+      const capacity = paymentCapacity(t, payment);
+      const amount = input.amountMinor ?? capacity.remaining_minor;
       if (!Number.isInteger(amount) || amount <= 0) {
         throw errors.invalid("amount_minor must be a positive integer.");
       }
-      if (amount > payment.amountMinor) {
-        throw errors.invalid(
-          "amount_minor cannot exceed the original payment amount.",
-        );
+      if (amount > capacity.remaining_minor) {
+        throw errors.disputeCapacity();
       }
 
       const now = nowIso();

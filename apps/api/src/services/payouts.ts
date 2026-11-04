@@ -11,9 +11,9 @@ import {
   sha256,
   type Page,
 } from "../domain";
+import { payoutAvailability } from "./balances";
 import { enqueue } from "./jobs";
 import { withIdempotency } from "./idempotency";
-import { accountBalance } from "./ledger";
 import { emitWebhookEvent } from "./webhooks";
 
 export interface CreatePayoutInput {
@@ -59,10 +59,10 @@ export function createPayout(
   const result = withIdempotency(db, idempotency, (tx) => {
     const t = tx as unknown as Db;
 
-    const available = accountBalance(t, input.merchantId, "merchant_payable");
-    if (available < input.amountMinor) {
+    const availability = payoutAvailability(t, input.merchantId);
+    if (availability.available_minor < input.amountMinor) {
       throw errors.insufficientBalance(
-        `Payout exceeds the available merchant balance of ${available} minor units.`,
+        `Payout exceeds the available merchant balance of ${availability.available_minor} minor units after pending payouts, refunds in flight, and open disputes.`,
       );
     }
 
@@ -76,6 +76,8 @@ export function createPayout(
       status: "pending",
       failureCode: null,
       processorReference: null,
+      requiresAttention: false,
+      attentionReason: null,
       createdAt: now,
       updatedAt: now,
     };

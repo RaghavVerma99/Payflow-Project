@@ -31,6 +31,30 @@ export function committedMinor(db: Db, paymentId: string): number {
   return Number(row?.total ?? 0);
 }
 
+export function committedMinorByPayment(
+  db: Db,
+  paymentIds: string[],
+): Map<string, number> {
+  if (paymentIds.length === 0) return new Map();
+
+  const rows = db
+    .select({
+      paymentId: disputes.paymentId,
+      total: sql<number>`coalesce(sum(${disputes.amountMinor}), 0)`,
+    })
+    .from(disputes)
+    .where(
+      and(
+        inArray(disputes.paymentId, paymentIds),
+        inArray(disputes.status, ["open", "lost"]),
+      ),
+    )
+    .groupBy(disputes.paymentId)
+    .all();
+
+  return new Map(rows.map((row) => [row.paymentId, Number(row.total)]));
+}
+
 export function paymentCapacity(
   db: Db,
   payment: PaymentRow,

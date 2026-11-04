@@ -110,6 +110,12 @@ export const errors = {
       409,
       "Refund amount exceeds the remaining refundable balance.",
     ),
+  disputeCapacity: () =>
+    new AppError(
+      "dispute_exceeds_remaining",
+      409,
+      "Dispute amount exceeds the remaining undisputed balance.",
+    ),
   notRefundable: () =>
     new AppError(
       "payment_not_refundable",

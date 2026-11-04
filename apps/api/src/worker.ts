@@ -2,7 +2,14 @@ import { and, eq, gte, sql } from "drizzle-orm";
 import type { AppConfig } from "./config";
 import type { Db } from "./db";
 import { addPaymentEvent, transitionPayment } from "./services/payments";
-import { claimNextJob, completeJob, enqueue, failJob } from "./services/jobs";
+import {
+  claimNextJob,
+  completeJob,
+  enqueue,
+  failJob,
+  markJobAggregateForAttention,
+  type JobKind,
+} from "./services/jobs";
 import {
   paymentJournalLines,
   payoutJournalLines,
@@ -85,7 +92,7 @@ export async function runOnce(ctx: WorkerContext): Promise<boolean> {
   } catch (error) {
     const outcome = failJob(ctx.db, job.id, error, ctx.config.maxJobAttempts);
     if (outcome === "dead") {
-      markEventDead(ctx, job);
+      markJobDead(ctx, job);
     }
     ctx.logger?.error(
       { job_id: job.id, kind: job.kind, outcome, err: String(error) },
@@ -107,15 +114,24 @@ export async function runDrain(
   return processed;
 }
 
-function markEventDead(ctx: WorkerContext, job: JobRow): void {
-  if (job.kind !== "deliver_webhooks") return;
-  const payload = parsePayload(job);
-  if (!payload.event_id) return;
-  ctx.db
-    .update(webhookEvents)
-    .set({ status: "dead", updatedAt: nowIso() })
-    .where(eq(webhookEvents.id, payload.event_id))
-    .run();
+function markJobDead(ctx: WorkerContext, job: JobRow): void {
+  if (job.kind === "deliver_webhooks") {
+    const payload = parsePayload(job);
+    if (!payload.event_id) return;
+    ctx.db
+      .update(webhookEvents)
+      .set({ status: "dead", updatedAt: nowIso() })
+      .where(eq(webhookEvents.id, payload.event_id))
+      .run();
+    return;
+  }
+
+  markJobAggregateForAttention(
+    ctx.db,
+    job.kind as JobKind,
+    job.aggregateId,
+    "A processing job exhausted its retries.",
+  );
 }
 
 function parsePayload(job: JobRow): JobPayload {

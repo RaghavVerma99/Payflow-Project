@@ -72,6 +72,81 @@ export function cancelPendingJobs(tx: Db, aggregateId: string): number {
   return result.changes;
 }
 
+const ATTENTION_KINDS: Partial<
+  Record<JobKind, "payments" | "refunds" | "payouts">
+> = {
+  process_payment: "payments",
+  reconcile_payment: "payments",
+  process_refund: "refunds",
+  reconcile_refund: "refunds",
+  process_payout: "payouts",
+  reconcile_payout: "payouts",
+};
+
+/**
+ * Dead jobs mean the resource is stuck in a non-terminal state and will never
+ * progress on its own. Flag the resource so operators can see and retry it
+ * instead of leaving it silently orphaned.
+ */
+export function markJobAggregateForAttention(
+  tx: Db,
+  kind: JobKind,
+  aggregateId: string | null,
+  reason: string,
+): void {
+  const target = ATTENTION_KINDS[kind];
+  if (!target || !aggregateId) return;
+
+  const now = nowIso();
+  if (target === "payments") {
+    tx.update(payments)
+      .set({ requiresAttention: true, attentionReason: reason, updatedAt: now })
+      .where(eq(payments.id, aggregateId))
+      .run();
+    return;
+  }
+  if (target === "refunds") {
+    tx.update(refunds)
+      .set({ requiresAttention: true, attentionReason: reason, updatedAt: now })
+      .where(eq(refunds.id, aggregateId))
+      .run();
+    return;
+  }
+  tx.update(payouts)
+    .set({ requiresAttention: true, attentionReason: reason, updatedAt: now })
+    .where(eq(payouts.id, aggregateId))
+    .run();
+}
+
+export function clearJobAggregateAttention(
+  tx: Db,
+  kind: JobKind,
+  aggregateId: string | null,
+): void {
+  const target = ATTENTION_KINDS[kind];
+  if (!target || !aggregateId) return;
+
+  const now = nowIso();
+  if (target === "payments") {
+    tx.update(payments)
+      .set({ requiresAttention: false, attentionReason: null, updatedAt: now })
+      .where(eq(payments.id, aggregateId))
+      .run();
+    return;
+  }
+  if (target === "refunds") {
+    tx.update(refunds)
+      .set({ requiresAttention: false, attentionReason: null, updatedAt: now })
+      .where(eq(refunds.id, aggregateId))
+      .run();
+    return;
+  }
+  tx.update(payouts)
+    .set({ requiresAttention: false, attentionReason: null, updatedAt: now })
+    .where(eq(payouts.id, aggregateId))
+    .run();
+}
+
 export function claimNextJob(
   db: Db,
   workerId: string,
@@ -393,6 +468,22 @@ export function retryDeadJob(
         })
         .where(eq(jobs.id, job.id))
         .run();
+
+      const remainingDead = job.aggregateId
+        ? t
+            .select({ id: jobs.id })
+            .from(jobs)
+            .where(
+              and(
+                eq(jobs.aggregateId, job.aggregateId),
+                eq(jobs.status, "dead"),
+              ),
+            )
+            .get()
+        : undefined;
+      if (!remainingDead) {
+        clearJobAggregateAttention(t, job.kind as JobKind, job.aggregateId);
+      }
 
       return {
         id: job.id,

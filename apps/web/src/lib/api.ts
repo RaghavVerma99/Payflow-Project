@@ -32,6 +32,8 @@ export interface Payment {
   refunded_minor: number;
   refund_reserved_minor: number;
   refundable_minor: number;
+  requires_attention: boolean;
+  attention_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +62,8 @@ export interface Payout {
   currency: string;
   destination: string;
   failure_code: string | null;
+  requires_attention: boolean;
+  attention_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -223,6 +227,8 @@ export interface Refund {
   currency: string;
   reason: string | null;
   failure_code: string | null;
+  requires_attention: boolean;
+  attention_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -334,8 +340,17 @@ export interface Journal {
   entries: JournalEntry[];
 }
 
+export interface PayoutAvailability {
+  payable_minor: number;
+  pending_payouts_minor: number;
+  refunds_in_flight_minor: number;
+  open_disputes_minor: number;
+  available_minor: number;
+}
+
 export interface AccountsResponse {
   data: Account[];
+  payout_availability: PayoutAvailability;
   trial_balance: {
     debits_minor: number;
     credits_minor: number;

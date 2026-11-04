@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { payments, refunds, type PaymentRow, type RefundRow } from "../schema";
+import { disputes, payments, refunds, type RefundRow } from "../schema";
 import {
   decodeCursor,
   encodeCursor,
@@ -14,16 +14,10 @@ import {
 } from "../domain";
 import { cancelPendingJobs, enqueue } from "./jobs";
 import { withIdempotency } from "./idempotency";
+import { paymentCapacity } from "./payment-capacity";
 import { addPaymentEvent, getPayment } from "./payments";
 import { serializeRefund, type RefundView } from "./serializers";
 import { emitWebhookEvent } from "./webhooks";
-
-export function refundableMinor(payment: PaymentRow): number {
-  return Math.max(
-    0,
-    payment.amountMinor - payment.refundedMinor - payment.refundReservedMinor,
-  );
-}
 
 export interface CreateRefundInput {
   merchantId: string;
@@ -69,7 +63,8 @@ export function createRefund(
       throw errors.notRefundable();
     }
 
-    const remaining = refundableMinor(payment);
+    const capacity = paymentCapacity(t, payment);
+    const remaining = capacity.remaining_minor;
     const amount = input.amountMinor ?? remaining;
 
     if (!Number.isInteger(amount) || amount <= 0) {
@@ -89,7 +84,12 @@ export function createRefund(
           eq(payments.id, payment.id),
           eq(payments.merchantId, input.merchantId),
           inArray(payments.status, ["succeeded", "partially_refunded"]),
-          sql`${payments.refundedMinor} + ${payments.refundReservedMinor} + ${amount} <= ${payments.amountMinor}`,
+          sql`${payments.refundedMinor} + ${payments.refundReservedMinor} + ${amount} + (
+            SELECT COALESCE(SUM(${disputes.amountMinor}), 0)
+            FROM ${disputes}
+            WHERE ${disputes.paymentId} = ${payments.id}
+              AND ${disputes.status} IN ('open','lost')
+          ) <= ${payments.amountMinor}`,
         ),
       )
       .run();
@@ -108,6 +108,8 @@ export function createRefund(
       reason: input.reason ?? null,
       failureCode: null,
       processorReference: null,
+      requiresAttention: false,
+      attentionReason: null,
       createdAt: now,
       updatedAt: now,
     };

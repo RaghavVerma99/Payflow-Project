@@ -84,10 +84,13 @@ function PayoutsPanel() {
     [accountsQuery.data],
   );
 
+  const availability = accountsQuery.data?.payout_availability;
+  const availableMinor = availability?.available_minor ?? 0;
+
   const payouts = payoutsQuery.data?.data ?? [];
   const amountMinor = Math.round(Number.parseFloat(amount) * 100);
   const validAmount = Number.isFinite(amountMinor) && amountMinor > 0;
-  const withinBalance = validAmount && amountMinor <= payableMinor;
+  const withinBalance = validAmount && amountMinor <= availableMinor;
 
   const createMutation = useMutation({
     mutationFn: (input: {
@@ -134,8 +137,8 @@ function PayoutsPanel() {
       setError("A payout needs a destination.");
       return;
     }
-    if (amountMinor > payableMinor) {
-      setError("The payout exceeds the merchant payable balance.");
+    if (amountMinor > availableMinor) {
+      setError("The payout exceeds the available balance.");
       return;
     }
 
@@ -162,21 +165,22 @@ function PayoutsPanel() {
               <Landmark className="size-5" />
             </div>
             <div>
-              <span className="label-craft">Merchant payable</span>
+              <span className="label-craft">Available to pay out</span>
               {accountsQuery.isLoading ? (
                 <Skeleton className="mt-2 h-7 w-40" />
               ) : (
                 <p className="display mt-1.5 text-[28px] leading-none">
-                  {formatCurrency(payableMinor)}
+                  {formatCurrency(availableMinor)}
                 </p>
               )}
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                Money we owe you. A payout may never exceed it.
+                Merchant payable {formatCurrency(payableMinor)} less pending
+                payouts, refunds in flight, and open disputes.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline">merchant_payable</Badge>
+            <Badge variant="outline">payout_availability</Badge>
             <Button size="sm" onClick={() => setOpen(true)}>
               <Plus className="size-4" />
               New payout
@@ -345,10 +349,10 @@ function PayoutsPanel() {
                   )}
                 >
                   {accountsQuery.isLoading
-                    ? "Reading the merchant payable balance…"
+                    ? "Reading the available balance…"
                     : validAmount && !withinBalance
-                      ? `The payable balance is only ${formatCurrency(payableMinor)}.`
-                      : `Available ${formatCurrency(payableMinor)} · sent as ${
+                      ? `The available balance is only ${formatCurrency(availableMinor)}.`
+                      : `Available ${formatCurrency(availableMinor)} · sent as ${
                           validAmount ? amountMinor : "—"
                         } minor units`}
                 </p>

@@ -10,6 +10,7 @@ import {
   TimeseriesSchema,
 } from "../schemas";
 import { ERROR_RESPONSES } from "../schemas";
+import { payoutAvailability } from "../services/balances";
 import {
   accountSummaries,
   listJournals,
@@ -59,6 +60,7 @@ export const readRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) => {
       return {
         data: accountSummaries(app.db, request.merchant.id),
+        payout_availability: payoutAvailability(app.db, request.merchant.id),
         trial_balance: trialBalance(app.db, request.merchant.id),
       };
     },

@@ -19,7 +19,7 @@ import {
   type RefundStatus,
 } from "../domain";
 
-export function serializePayment(payment: PaymentRow) {
+export function serializePayment(payment: PaymentRow, disputedMinor = 0) {
   return {
     object: "payment" as const,
     id: payment.id,
@@ -35,7 +35,10 @@ export function serializePayment(payment: PaymentRow) {
     refund_reserved_minor: payment.refundReservedMinor,
     refundable_minor: Math.max(
       0,
-      payment.amountMinor - payment.refundedMinor - payment.refundReservedMinor,
+      payment.amountMinor -
+        payment.refundedMinor -
+        payment.refundReservedMinor -
+        disputedMinor,
     ),
     requires_attention: payment.requiresAttention,
     attention_reason: payment.attentionReason,

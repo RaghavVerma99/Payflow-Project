@@ -21,6 +21,7 @@ import {
 } from "../domain";
 import { enqueue, cancelPendingJobs } from "./jobs";
 import { withIdempotency } from "./idempotency";
+import { committedMinor, committedMinorByPayment } from "./payment-capacity";
 import { requireActivePaymentMethod } from "./payment-methods";
 import { emitWebhookEvent } from "./webhooks";
 import {
@@ -98,6 +99,8 @@ export function createPayment(
       failureCode: null,
       refundedMinor: 0,
       refundReservedMinor: 0,
+      requiresAttention: false,
+      attentionReason: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -197,7 +200,7 @@ export function getPaymentDetail(
     .all();
 
   return {
-    ...serializePayment(payment),
+    ...serializePayment(payment, committedMinor(db, paymentId)),
     attempts: attempts.map(serializeAttempt),
     events: events.map(serializeEvent),
   };
@@ -241,9 +244,15 @@ export function listPayments(
   const hasMore = rows.length > options.limit;
   const page = rows.slice(0, options.limit);
   const last = page[page.length - 1];
+  const disputed = committedMinorByPayment(
+    db,
+    page.map((payment) => payment.id),
+  );
 
   return {
-    data: page.map(serializePayment),
+    data: page.map((payment) =>
+      serializePayment(payment, disputed.get(payment.id) ?? 0),
+    ),
     has_more: hasMore,
     next_cursor: hasMore && last ? encodeCursor(last) : null,
   };

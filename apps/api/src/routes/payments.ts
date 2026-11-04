@@ -11,6 +11,7 @@ import {
   RefundListSchema,
 } from "../schemas";
 import { ERROR_RESPONSES } from "../schemas";
+import { committedMinor } from "../services/payment-capacity";
 import {
   cancelPayment,
   createPayment,
@@ -94,7 +95,9 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
 
       if (replayed) reply.header("Idempotency-Replayed", "true");
       reply.header("Location", `/v1/payments/${payment.id}`);
-      return reply.code(202).send(serializePayment(payment));
+      return reply
+        .code(202)
+        .send(serializePayment(payment, committedMinor(app.db, payment.id)));
     },
   );
 
@@ -167,7 +170,7 @@ export const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
         request.merchant.id,
         request.params.id,
       );
-      return serializePayment(payment);
+      return serializePayment(payment, committedMinor(app.db, payment.id));
     },
   );
 
