@@ -37,6 +37,8 @@ export function serializePayment(payment: PaymentRow) {
       0,
       payment.amountMinor - payment.refundedMinor - payment.refundReservedMinor,
     ),
+    requires_attention: payment.requiresAttention,
+    attention_reason: payment.attentionReason,
     created_at: payment.createdAt,
     updated_at: payment.updatedAt,
   };
@@ -55,6 +57,8 @@ export function serializeRefund(refund: RefundRow) {
     currency: refund.currency,
     reason: refund.reason,
     failure_code: refund.failureCode,
+    requires_attention: refund.requiresAttention,
+    attention_reason: refund.attentionReason,
     created_at: refund.createdAt,
     updated_at: refund.updatedAt,
   };
@@ -110,6 +114,8 @@ export function serializePayout(payout: PayoutRow) {
     currency: payout.currency,
     destination: payout.destination,
     failure_code: payout.failureCode,
+    requires_attention: payout.requiresAttention,
+    attention_reason: payout.attentionReason,
     created_at: payout.createdAt,
     updated_at: payout.updatedAt,
   };

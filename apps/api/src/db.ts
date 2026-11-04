@@ -98,6 +98,40 @@ const MIGRATIONS: Migration[] = [
       migrateColumns(sqlite);
     },
   },
+  {
+    version: 2,
+    apply(sqlite) {
+      for (const table of ["payments", "refunds", "payouts"]) {
+        addColumnIfMissing(
+          sqlite,
+          table,
+          "requires_attention",
+          "INTEGER NOT NULL DEFAULT 0 CHECK (requires_attention IN (0,1))",
+        );
+        addColumnIfMissing(sqlite, table, "attention_reason", "TEXT");
+      }
+
+      sqlite.exec(`
+        CREATE INDEX IF NOT EXISTS ix_payments_attention ON payments(merchant_id, requires_attention);
+        CREATE INDEX IF NOT EXISTS ix_refunds_attention ON refunds(merchant_id, requires_attention);
+        CREATE INDEX IF NOT EXISTS ix_payouts_attention ON payouts(merchant_id, requires_attention);
+      `);
+
+      for (const table of ["payments", "refunds", "payouts"]) {
+        sqlite
+          .prepare(
+            `UPDATE ${table}
+             SET requires_attention = 1,
+                 attention_reason = COALESCE(attention_reason, 'A processing job exhausted its retries.')
+             WHERE EXISTS (
+               SELECT 1 FROM jobs
+               WHERE jobs.aggregate_id = ${table}.id AND jobs.status = 'dead'
+             )`,
+          )
+          .run();
+      }
+    },
+  },
 ];
 
 export function createDb(dbPath: string): DbHandle {

@@ -43,6 +43,10 @@ export const payments = sqliteTable("payments", {
   failureCode: text("failure_code"),
   refundedMinor: integer("refunded_minor").notNull().default(0),
   refundReservedMinor: integer("refund_reserved_minor").notNull().default(0),
+  requiresAttention: integer("requires_attention", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  attentionReason: text("attention_reason"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -138,6 +142,10 @@ export const refunds = sqliteTable("refunds", {
   reason: text("reason"),
   failureCode: text("failure_code"),
   processorReference: text("processor_reference"),
+  requiresAttention: integer("requires_attention", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  attentionReason: text("attention_reason"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -187,6 +195,10 @@ export const payouts = sqliteTable("payouts", {
   status: text("status").notNull().default("pending"),
   failureCode: text("failure_code"),
   processorReference: text("processor_reference"),
+  requiresAttention: integer("requires_attention", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  attentionReason: text("attention_reason"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

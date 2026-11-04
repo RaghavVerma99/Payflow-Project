@@ -52,6 +52,8 @@ export const PayoutSchema = z
     currency: z.string(),
     destination: z.string(),
     failure_code: z.string().nullable(),
+    requires_attention: z.boolean(),
+    attention_reason: z.string().nullable(),
     created_at: ISODate,
     updated_at: ISODate,
   })
@@ -238,6 +240,8 @@ export const PaymentSchema = z
     refunded_minor: z.number().int(),
     refund_reserved_minor: z.number().int(),
     refundable_minor: z.number().int(),
+    requires_attention: z.boolean(),
+    attention_reason: z.string().nullable(),
     created_at: ISODate,
     updated_at: ISODate,
   })
@@ -300,6 +304,8 @@ export const RefundSchema = z
     currency: z.string(),
     reason: z.string().nullable(),
     failure_code: z.string().nullable(),
+    requires_attention: z.boolean(),
+    attention_reason: z.string().nullable(),
     created_at: ISODate,
     updated_at: ISODate,
   })
@@ -346,6 +352,14 @@ export const AccountSchema = z.object({
   balance_minor: z.number().int(),
 });
 
+export const PayoutAvailabilitySchema = z.object({
+  payable_minor: z.number().int(),
+  pending_payouts_minor: z.number().int(),
+  refunds_in_flight_minor: z.number().int(),
+  open_disputes_minor: z.number().int(),
+  available_minor: z.number().int(),
+});
+
 export const JournalEntrySchema = z.object({
   id: z.string(),
   account_id: z.string(),
@@ -373,6 +387,7 @@ export const JournalListSchema = z.object({
 
 export const AccountsResponseSchema = z.object({
   data: z.array(AccountSchema),
+  payout_availability: PayoutAvailabilitySchema,
   trial_balance: z.object({
     debits_minor: z.number().int(),
     credits_minor: z.number().int(),

@@ -45,12 +45,15 @@ CREATE TABLE IF NOT EXISTS payments (
   failure_code TEXT,
   refunded_minor INTEGER NOT NULL DEFAULT 0 CHECK (refunded_minor >= 0),
   refund_reserved_minor INTEGER NOT NULL DEFAULT 0 CHECK (refund_reserved_minor >= 0),
+  requires_attention INTEGER NOT NULL DEFAULT 0 CHECK (requires_attention IN (0,1)),
+  attention_reason TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   CHECK (refunded_minor + refund_reserved_minor <= amount_minor)
 );
 CREATE INDEX IF NOT EXISTS ix_payments_merchant_created ON payments(merchant_id, created_at, id);
 CREATE INDEX IF NOT EXISTS ix_payments_merchant_status ON payments(merchant_id, status, created_at);
+CREATE INDEX IF NOT EXISTS ix_payments_attention ON payments(merchant_id, requires_attention);
 
 CREATE TABLE IF NOT EXISTS payment_attempts (
   id TEXT PRIMARY KEY,
@@ -157,11 +160,14 @@ CREATE TABLE IF NOT EXISTS refunds (
   reason TEXT,
   failure_code TEXT,
   processor_reference TEXT,
+  requires_attention INTEGER NOT NULL DEFAULT 0 CHECK (requires_attention IN (0,1)),
+  attention_reason TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_refunds_payment_status ON refunds(payment_id, status);
 CREATE INDEX IF NOT EXISTS ix_refunds_merchant ON refunds(merchant_id, created_at);
+CREATE INDEX IF NOT EXISTS ix_refunds_attention ON refunds(merchant_id, requires_attention);
 
 CREATE TABLE IF NOT EXISTS webhook_endpoints (
   id TEXT PRIMARY KEY,
@@ -215,10 +221,13 @@ CREATE TABLE IF NOT EXISTS payouts (
     CHECK (status IN ('pending','processing','paid','failed','unknown')),
   failure_code TEXT,
   processor_reference TEXT,
+  requires_attention INTEGER NOT NULL DEFAULT 0 CHECK (requires_attention IN (0,1)),
+  attention_reason TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_payouts_merchant ON payouts(merchant_id, created_at);
+CREATE INDEX IF NOT EXISTS ix_payouts_attention ON payouts(merchant_id, requires_attention);
 
 CREATE TABLE IF NOT EXISTS disputes (
   id TEXT PRIMARY KEY,
