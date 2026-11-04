@@ -202,7 +202,7 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
-  if (app.config.env === "dev") {
+  if (app.config.env === "dev" || app.config.demoMode) {
     app.post(
       "/_sink/:token",
       {

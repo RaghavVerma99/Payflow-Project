@@ -11,7 +11,7 @@ This document is the understanding.
 
 > [!NOTE]
 > **Simulation only.** No card data, no processor, no money. Integer paise in a
-> local SQLite file.
+> single SQLite file.
 
 ---
 
@@ -1317,6 +1317,6 @@ existing migration files once released.
 
 **PayFlow — imaginary money, rigorously accounted for.**
 
-Reference: [`README.md`](./README.md) · API: `/docs` · Console: `:5173`
+Reference: [`README.md`](./README.md) · API: `/docs` · Deployment: [`DEPLOYMENT.md`](./DEPLOYMENT.md)
 
 </div>

@@ -1,8 +1,8 @@
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
-import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { and, eq } from "drizzle-orm";
-import { loadConfig, repoRoot } from "./config";
+import { demoKeyPath, loadConfig } from "./config";
 import { createDb, type Db } from "./db";
 import { newId, nowIso } from "./domain";
 import {
@@ -16,7 +16,11 @@ import {
   refunds,
   webhookEndpoints,
 } from "./schema";
-import { createApiKeyForMerchant, createMerchant } from "./services/auth";
+import {
+  createApiKeyForMerchant,
+  createMerchant,
+  resolveApiKey,
+} from "./services/auth";
 import { enqueue } from "./services/jobs";
 import {
   accountBalance,
@@ -53,7 +57,7 @@ interface DemoStats {
   refunds: number;
 }
 
-function seedDemo(
+export function seedDemo(
   db: Db,
   merchantId: string,
   maxJobAttempts: number,
@@ -286,9 +290,10 @@ function insertEvent(
     .run();
 }
 
-function seedPlatform(
+export function seedPlatform(
   db: Db,
   merchantId: string,
+  port: number,
 ): { methods: number; endpoints: number; disputes: number; payouts: number } {
   const existingMethods = db
     .select({ id: paymentMethods.id })
@@ -371,7 +376,7 @@ function seedPlatform(
         .values({
           id: newId("whe"),
           merchantId,
-          url: "http://127.0.0.1:4000/_sink/demo",
+          url: `http://127.0.0.1:${port}/_sink/demo`,
           secret: `whsec_${randomBytes(24).toString("base64url")}`,
           description: "Development sink",
           status: "active",
@@ -452,8 +457,30 @@ function seedPlatform(
   };
 }
 
+function readSeededKey(keyFile: string): string | null {
+  if (!existsSync(keyFile)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(keyFile, "utf8")) as {
+      api_key?: string;
+    };
+    return parsed.api_key ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function resetDatabase(dbPath: string): void {
+  if (dbPath === ":memory:") return;
+  for (const suffix of ["", "-wal", "-shm"]) {
+    rmSync(`${dbPath}${suffix}`, { force: true });
+  }
+}
+
 function main(): void {
+  const reset = process.argv.includes("--reset");
   const config = loadConfig({ workerEnabled: false });
+  if (reset) resetDatabase(config.dbPath);
+
   const handle = createDb(config.dbPath);
   const db = handle.db;
 
@@ -494,26 +521,35 @@ function main(): void {
       const acme =
         existing.find((merchant) => merchant.name === "Acme Store") ??
         existing[0];
-      const key = createApiKeyForMerchant(db, acme.id, config.apiKeyPepper);
+      const keyFile = demoKeyPath(config.dbPath);
+      const seededKey = readSeededKey(keyFile);
+      const resolved = seededKey
+        ? resolveApiKey(db, seededKey, config.apiKeyPepper)
+        : null;
+
       acmeId = acme.id;
       acmeName = acme.name;
-      acmeKey = key.rawKey;
+      acmeKey =
+        seededKey && resolved?.id === acme.id
+          ? seededKey
+          : createApiKeyForMerchant(db, acme.id, config.apiKeyPepper).rawKey;
+
       credentials.push({
         name: acme.name,
         merchant_id: acme.id,
-        api_key: key.rawKey,
+        api_key: acmeKey,
         seeded: false,
       });
     }
 
     const demo = seedDemo(db, acmeId, config.maxJobAttempts);
-    const platform = seedPlatform(db, acmeId);
+    const platform = seedPlatform(db, acmeId, config.port);
 
     for (const credential of credentials) {
       credential.seeded = credential.merchant_id === acmeId;
     }
 
-    const keyFile = path.resolve(repoRoot, "data", "demo-key.json");
+    const keyFile = demoKeyPath(config.dbPath);
     writeFileSync(
       keyFile,
       JSON.stringify(
@@ -528,12 +564,14 @@ function main(): void {
       JSON.stringify(
         {
           environment: config.env,
+          demo_mode: config.demoMode,
+          reset,
           database: config.dbPath,
           demo_key_file: keyFile,
           merchants: credentials,
           demo,
           platform,
-          note: "Store the API key now. Only a hash is kept in the database. Re-run seed for a fresh key.",
+          note: "The demo key is stored beside the database. Seeding is idempotent unless --reset is passed.",
         },
         null,
         2,
@@ -544,4 +582,9 @@ function main(): void {
   }
 }
 
-main();
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main();
+}

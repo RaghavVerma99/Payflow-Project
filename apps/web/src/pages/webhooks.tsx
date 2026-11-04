@@ -39,14 +39,12 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui";
-import { api } from "../lib/api";
+import { api, apiOrigin } from "../lib/api";
 import { cn, humanize, jsonPretty, relativeTime } from "../lib/utils";
 
 const SINK_TOKEN = "demo";
-const SINK_PATHS = [
-  `/_sink/${SINK_TOKEN}`,
-  `http://127.0.0.1:4000/_sink/${SINK_TOKEN}`,
-];
+const SINK_URL = `${apiOrigin()}/_sink/${SINK_TOKEN}`;
+const SINK_PATHS = [SINK_URL];
 
 interface SinkEntry {
   id: string;
@@ -102,9 +100,9 @@ function SinkDialog({
         <DialogHeader>
           <DialogTitle>Inspect the sink</DialogTitle>
           <DialogDescription>
-            The development sink keeps the last fifty payloads delivered to{" "}
-            <span className="font-mono">{SINK_PATHS[0]}</span>. Nothing leaves
-            this machine.
+            The demo sink keeps the last fifty payloads delivered to{" "}
+            <span className="font-mono">{SINK_URL}</span>. Nothing leaves this
+            deployment.
           </DialogDescription>
         </DialogHeader>
 
@@ -659,10 +657,9 @@ export function WebhooksPage() {
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/60 bg-background/20 px-4 py-3 text-[10px] text-muted-foreground">
         <p className="inline-flex items-center gap-2">
           <Webhook className="size-3 text-primary" />
-          The development sink lives at{" "}
-          <span className="font-mono">GET /_sink/:token</span> — the seed
-          registers{" "}
-          <span className="font-mono">http://127.0.0.1:4000/_sink/demo</span>.
+          The demo sink lives at{" "}
+          <span className="font-mono">GET /_sink/demo</span> — seeded deliveries
+          are captured at <span className="font-mono">{SINK_URL}</span>.
         </p>
         <Button variant="outline" size="sm" onClick={() => setSinkOpen(true)}>
           <Send className="size-3.5" />
@@ -687,7 +684,7 @@ export function WebhooksPage() {
                 id="endpoint-url"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="http://127.0.0.1:4000/_sink/demo"
+                placeholder={SINK_URL}
                 className="font-mono text-xs"
               />
             </div>

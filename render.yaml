@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: payflow
+    runtime: docker
+    plan: starter
+    region: oregon
+    numInstances: 1
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PAYFLOW_ENV
+        value: production
+      - key: PAYFLOW_DEMO_MODE
+        value: "true"
+      - key: PAYFLOW_HOST
+        value: 0.0.0.0
+      - key: PAYFLOW_DB_PATH
+        value: /data/payflow.db
+      - key: PAYFLOW_WORKER_ENABLED
+        value: "true"
+      - key: PAYFLOW_ALLOW_SIMULATOR_CONTROLS
+        value: "true"
+      - key: PAYFLOW_LOG_LEVEL
+        value: info
+      - key: PAYFLOW_API_KEY_PEPPER
+        generateValue: true
+      - key: PAYFLOW_DEMO_RESET_TOKEN
+        generateValue: true
+    disk:
+      name: payflow-data
+      mountPath: /data
+      sizeGB: 1

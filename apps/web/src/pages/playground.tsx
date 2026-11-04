@@ -24,7 +24,7 @@ import {
   Select,
   Textarea,
 } from "../components/ui";
-import { rawRequest, type RawResponse } from "../lib/api";
+import { rawRequest, apiOrigin, type RawResponse } from "../lib/api";
 import { cn, jsonPretty, makeIdempotencyKey } from "../lib/utils";
 
 interface Preset {
@@ -188,10 +188,7 @@ export function PlaygroundPage() {
     }
   };
 
-  const origin =
-    window.location.port === "5173"
-      ? "http://localhost:4000"
-      : window.location.origin;
+  const origin = apiOrigin();
 
   const curl = [
     `curl -X ${method} '${origin}${path}'`,

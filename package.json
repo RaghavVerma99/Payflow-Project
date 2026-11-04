@@ -17,6 +17,7 @@
     "build": "npm run build -w @payflow/web && npm run build -w @payflow/api",
     "start": "npm run start -w @payflow/api",
     "seed": "npm run seed -w @payflow/api",
+    "seed:reset": "npm run seed:reset -w @payflow/api",
     "test": "npm run test -w @payflow/api",
     "typecheck": "npm run typecheck -w @payflow/api && npm run typecheck -w @payflow/web",
     "verify": "npm run typecheck && npm test && npm run build",

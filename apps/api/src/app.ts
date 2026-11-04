@@ -23,6 +23,7 @@ import { loadConfig, type AppConfig } from "./config";
 import { createDb } from "./db";
 import { AppError, errors, newId } from "./domain";
 import type { MerchantContext } from "./types";
+import { demoRoutes } from "./routes/demo";
 import { healthRoutes } from "./routes/health";
 import { metaRoutes } from "./routes/meta";
 import { methodRoutes } from "./routes/methods";
@@ -205,6 +206,7 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
   });
 
   void app.register(healthRoutes);
+  void app.register(demoRoutes);
   void app.register(metaRoutes);
   void app.register(paymentRoutes);
   void app.register(refundRoutes);

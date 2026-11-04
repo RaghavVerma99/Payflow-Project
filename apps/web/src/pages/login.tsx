@@ -189,7 +189,7 @@ export function LoginPage() {
             </span>
             <span className="inline-flex items-center gap-1.5">
               <LockKeyhole className="size-3 text-primary" />
-              Local SQLite
+              SQLite ledger
             </span>
           </div>
         </section>

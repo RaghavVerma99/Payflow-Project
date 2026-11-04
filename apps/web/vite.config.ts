@@ -10,6 +10,7 @@ export default defineConfig({
       "/v1": "http://localhost:4000",
       "/health": "http://localhost:4000",
       "/docs": "http://localhost:4000",
+      "/_sink": "http://localhost:4000",
     },
   },
   build: {

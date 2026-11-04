@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { apiKeys } from "../schema";
 import { errors, newId, nowIso } from "../domain";
@@ -85,6 +85,21 @@ export function revokeApiKey(
     .get();
 
   if (!key) throw errors.notFound("API key");
+
+  if (!key.revokedAt) {
+    const active = db
+      .select({ value: sql<number>`count(*)` })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.merchantId, merchantId), isNull(apiKeys.revokedAt)))
+      .get();
+
+    if (Number(active?.value ?? 0) <= 1) {
+      throw errors.conflict(
+        "At least one active API key must remain. Create a new key before revoking this one.",
+        "last_api_key",
+      );
+    }
+  }
 
   const revokedAt = key.revokedAt ?? nowIso();
   if (!key.revokedAt) {

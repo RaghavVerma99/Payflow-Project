@@ -907,6 +907,7 @@ async function deliverWebhook(
       attempt,
       4000,
       ctx.config.env !== "production",
+      ctx.config.demoMode,
     );
     recordDelivery(ctx.db, { event, attempt, result });
 

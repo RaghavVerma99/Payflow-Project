@@ -363,6 +363,11 @@ export interface DemoSession {
 
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
+export function apiOrigin(): string {
+  if (!BASE) return window.location.origin;
+  return new URL(BASE, window.location.origin).origin;
+}
+
 let apiKey: string | null = null;
 
 export function setApiKey(key: string | null): void {
@@ -409,7 +414,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(
       0,
       "network_error",
-      "Could not reach the PayFlow API. Is it running on port 4000?",
+      "Could not reach the PayFlow API. Check that the service is running and reachable.",
     );
   }
 

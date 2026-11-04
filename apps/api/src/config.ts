@@ -13,6 +13,8 @@ export interface AppConfig {
   workerLeaseSeconds: number;
   maxJobAttempts: number;
   allowSimulatorControls: boolean;
+  demoMode: boolean;
+  demoResetToken: string | null;
   idempotencyTtlHours: number;
   defaultPageSize: number;
   maxPageSize: number;
@@ -28,6 +30,13 @@ export const repoRoot = path.resolve(import.meta.dirname, "../../..");
 function resolveDbPath(value: string | undefined): string {
   if (!value) return path.join(repoRoot, "data", "payflow.db");
   return path.isAbsolute(value) ? value : path.resolve(repoRoot, value);
+}
+
+export function demoKeyPath(dbPath: string): string {
+  if (dbPath === ":memory:") {
+    return path.join(repoRoot, "data", "demo-key.json");
+  }
+  return path.join(path.dirname(dbPath), "demo-key.json");
 }
 
 function bool(value: string | undefined, fallback: boolean): boolean {
@@ -72,11 +81,21 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     throw new Error("PAYFLOW_ENV must be dev, test, or production.");
   }
   const env = rawEnv as Environment;
+  const demoMode = bool(process.env.PAYFLOW_DEMO_MODE, false);
+  const portValue = process.env.PAYFLOW_PORT ?? process.env.PORT;
 
   const config: AppConfig = {
     env,
-    host: process.env.PAYFLOW_HOST ?? "127.0.0.1",
-    port: int("PAYFLOW_PORT", process.env.PAYFLOW_PORT, 4000, 1, 65535),
+    host:
+      process.env.PAYFLOW_HOST ??
+      (env === "production" ? "0.0.0.0" : "127.0.0.1"),
+    port: int(
+      process.env.PAYFLOW_PORT ? "PAYFLOW_PORT" : "PORT",
+      portValue,
+      4000,
+      1,
+      65535,
+    ),
     dbPath: resolveDbPath(process.env.PAYFLOW_DB_PATH),
     apiKeyPepper: process.env.PAYFLOW_API_KEY_PEPPER ?? DEV_PEPPER,
     workerEnabled: bool(process.env.PAYFLOW_WORKER_ENABLED, env !== "test"),
@@ -103,8 +122,10 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     ),
     allowSimulatorControls: bool(
       process.env.PAYFLOW_ALLOW_SIMULATOR_CONTROLS,
-      env !== "production",
+      env !== "production" || demoMode,
     ),
+    demoMode,
+    demoResetToken: process.env.PAYFLOW_DEMO_RESET_TOKEN?.trim() || null,
     idempotencyTtlHours: int(
       "PAYFLOW_IDEMPOTENCY_TTL_HOURS",
       process.env.PAYFLOW_IDEMPOTENCY_TTL_HOURS,
@@ -174,9 +195,9 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     if (!config.apiKeyPepper.trim() || config.apiKeyPepper === DEV_PEPPER) {
       throw new Error("PAYFLOW_API_KEY_PEPPER must be set in production");
     }
-    if (config.allowSimulatorControls) {
+    if (config.allowSimulatorControls && !config.demoMode) {
       throw new Error(
-        "PAYFLOW_ALLOW_SIMULATOR_CONTROLS must be false in production",
+        "PAYFLOW_ALLOW_SIMULATOR_CONTROLS requires PAYFLOW_DEMO_MODE=true in production",
       );
     }
   }

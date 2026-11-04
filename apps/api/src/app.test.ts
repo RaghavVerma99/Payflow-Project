@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import { createMerchant } from "./services/auth";
@@ -613,6 +616,75 @@ describe("analytics", () => {
       status: "ok",
       checks: { database: "ok", worker: "disabled" },
     });
+  });
+});
+
+describe("demo mode", () => {
+  it("resets demo data without invalidating the seeded key", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "payflow-demo-"));
+    const dbPath = join(directory, "payflow.db");
+    const instance = createApp({
+      dbPath,
+      config: {
+        env: "test",
+        dbPath,
+        demoMode: true,
+        demoResetToken: "reset-token",
+        workerEnabled: false,
+        allowSimulatorControls: true,
+        apiKeyPepper: PEPPER,
+        rateLimitMax: 100_000,
+        logLevel: "silent",
+      },
+    });
+    const merchant = createMerchant(instance.db, "Acme Store", PEPPER);
+    writeFileSync(
+      join(directory, "demo-key.json"),
+      JSON.stringify({
+        api_key: merchant.rawKey,
+        merchant_id: merchant.merchantId,
+        name: "Acme Store",
+      }),
+    );
+    await instance.ready();
+
+    try {
+      const denied = await instance.inject({
+        method: "POST",
+        url: "/v1/demo/reset",
+      });
+      expect(denied.statusCode).toBe(401);
+
+      const reset = await instance.inject({
+        method: "POST",
+        url: "/v1/demo/reset",
+        headers: { "x-demo-reset-token": "reset-token" },
+      });
+      expect(reset.statusCode).toBe(200);
+      expect(reset.json()).toMatchObject({
+        object: "demo_reset",
+        merchant: { id: merchant.merchantId },
+      });
+      expect(reset.json().payments).toBeGreaterThan(0);
+
+      const session = await instance.inject({
+        method: "GET",
+        url: "/v1/demo/session",
+      });
+      expect(session.statusCode).toBe(200);
+      expect(session.json().api_key).toBe(merchant.rawKey);
+
+      const payments = await instance.inject({
+        method: "GET",
+        url: "/v1/payments?limit=1",
+        headers: { authorization: `Bearer ${merchant.rawKey}` },
+      });
+      expect(payments.statusCode).toBe(200);
+      expect(payments.json().data).toHaveLength(1);
+    } finally {
+      await instance.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -1261,7 +1333,10 @@ describe("disputes", () => {
     expect(overRefund.statusCode).toBe(409);
     expect(overRefund.json().error.code).toBe("refund_exceeds_remaining");
 
-    const refund = await createRefund({ payment_id: created.id });
+    const refund = await createRefund({
+      payment_id: created.id,
+      simulator_scenario: "approve",
+    });
     expect(refund.statusCode).toBe(202);
     expect(refund.json().amount_minor).toBe(14_900);
 
@@ -1318,6 +1393,29 @@ describe("disputes", () => {
 });
 
 describe("api keys", () => {
+  it("refuses to revoke the last active key", async () => {
+    const list = (
+      await app.inject({ method: "GET", url: "/v1/api_keys", headers: auth() })
+    ).json();
+
+    expect(list.data).toHaveLength(1);
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/api_keys/${list.data[0].id}/revoke`,
+      headers: auth(),
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe("last_api_key");
+
+    const stillWorks = await app.inject({
+      method: "GET",
+      url: "/v1/merchants/me",
+      headers: auth(),
+    });
+    expect(stillWorks.statusCode).toBe(200);
+  });
+
   it("issues a key once and rejects it after revocation", async () => {
     const created = await app.inject({
       method: "POST",

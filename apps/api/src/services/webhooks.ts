@@ -175,16 +175,28 @@ function expandIpv6(host: string): string | null {
   return groups.map((group) => group.padStart(4, "0")).join("");
 }
 
+function isLoopbackAddress(address: string): boolean {
+  const value = address.toLowerCase();
+  return (
+    value === "::1" || value === "0:0:0:0:0:0:0:1" || value.startsWith("127.")
+  );
+}
+
 async function destinationAddress(
   hostname: string,
   allowPrivateHosts: boolean,
+  allowLoopbackHosts = false,
 ) {
   const normalized = hostname.replace(/^\[|\]$/g, "");
   const addresses = await lookup(normalized, { all: true, verbatim: true });
   if (addresses.length === 0) throw new Error("Webhook host did not resolve.");
   if (
     !allowPrivateHosts &&
-    addresses.some(({ address }) => isPrivateHost(address))
+    addresses.some(
+      ({ address }) =>
+        isPrivateHost(address) &&
+        !(allowLoopbackHosts && isLoopbackAddress(address)),
+    )
   ) {
     throw new Error("Webhook host resolved to a private or reserved address.");
   }
@@ -416,6 +428,7 @@ export async function deliverToEndpoint(
   attempt: number,
   timeoutMs = 4000,
   allowPrivateHosts = true,
+  allowLoopbackHosts = false,
 ): Promise<DeliveryResult> {
   const body = event.payload;
   const timestamp = Math.floor(Date.now() / 1000);
@@ -432,6 +445,7 @@ export async function deliverToEndpoint(
     const address = await destinationAddress(
       target.hostname,
       allowPrivateHosts,
+      allowLoopbackHosts,
     );
     const response = await postPinned(
       target,

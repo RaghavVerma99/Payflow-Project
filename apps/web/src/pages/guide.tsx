@@ -30,7 +30,7 @@ import {
   CardTitle,
   CopyButton,
 } from "../components/ui";
-import { api } from "../lib/api";
+import { api, apiOrigin } from "../lib/api";
 import { cn } from "../lib/utils";
 
 const INVARIANTS = [
@@ -110,16 +110,16 @@ export function verify(rawBody: string, header: string, secret: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }`;
 
-const QUICKSTART = `KEY=sk_test_...
+const quickstart = (origin: string) => `KEY=sk_test_...
 
-curl -s -X POST localhost:4000/v1/payments \\
+curl -s -X POST ${origin}/v1/payments \\
   -H "Authorization: Bearer $KEY" \\
   -H "Idempotency-Key: order_1042_attempt_1" \\
   -H "Content-Type: application/json" \\
   -d '{"amount_minor":24900,"currency":"INR","simulator_scenario":"approve"}'
 
 # 202 Accepted, status "created" — poll for the settled state
-curl -s localhost:4000/v1/payments/pay_... -H "Authorization: Bearer $KEY"`;
+curl -s ${origin}/v1/payments/pay_... -H "Authorization: Bearer $KEY"`;
 
 function Box({
   icon: Icon,
@@ -190,6 +190,7 @@ export function GuidePage() {
   });
 
   const capabilities = capabilitiesQuery.data;
+  const quickstartSnippet = quickstart(apiOrigin());
 
   return (
     <div>
@@ -520,10 +521,10 @@ npm run dev`}</Code>
                   First three calls
                 </CardTitle>
               </div>
-              <CopyButton value={QUICKSTART} />
+              <CopyButton value={quickstartSnippet} />
             </CardHeader>
             <CardContent className="pt-4">
-              <Code>{QUICKSTART}</Code>
+              <Code>{quickstartSnippet}</Code>
             </CardContent>
           </Card>
         </Reveal>
