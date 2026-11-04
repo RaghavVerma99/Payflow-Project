@@ -35,7 +35,10 @@ ENV NODE_ENV=production \
 WORKDIR /app
 
 RUN groupadd --system --gid 1001 payflow \
-  && useradd --system --uid 1001 --gid payflow --home-dir /app payflow
+  && useradd --system --uid 1001 --gid payflow --home-dir /app payflow \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends gosu \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build --chown=payflow:payflow /app/package.json /app/package-lock.json ./
 COPY --from=build --chown=payflow:payflow /app/node_modules ./node_modules
@@ -48,8 +51,8 @@ RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh \
   && mkdir -p /data \
   && chown payflow:payflow /data
 
-USER payflow
-
+# The entrypoint starts as root so it can take ownership of the mounted disk,
+# then immediately re-executes itself as the unprivileged payflow user.
 EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

@@ -94,8 +94,10 @@ Without `PAYFLOW_DEMO_MODE=true`, production requires
 
 ## First boot and seeding
 
-`docker-entrypoint.sh` runs `node dist/seed.js` before starting the server.
-Seeding is **idempotent**:
+`docker-entrypoint.sh` runs `node dist/seed.js` before starting the server. It
+starts as root only long enough to take ownership of the mounted disk, then
+drops to the unprivileged `payflow` user for seeding and serving. Seeding is
+**idempotent**:
 
 - A new disk gets two merchants, 14 days of activity, payment methods, a
   dispute, a payout, a webhook endpoint, and `/data/demo-key.json`.
@@ -197,15 +199,16 @@ On PowerShell, set the variables with `$env:NAME = "value"` before each command.
 
 ## Troubleshooting
 
-| Symptom                            | Likely cause                             | Fix                                                                             |
-| ---------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------- |
-| Build fails on `better-sqlite3`    | Missing native build tools               | The Dockerfile installs Python and a C++ toolchain; rebuild from the repo root. |
-| `demo_not_seeded`                  | Disk is empty or the key file is missing | Check logs for the seed step, then restart the service.                         |
-| Demo key stopped working           | Pepper changed on a new disk             | Restart so the entrypoint creates a new key, or run `seed:reset`.               |
-| Data disappears on deploy          | No disk mounted at `/data`               | Add the persistent disk and set `PAYFLOW_DB_PATH=/data/payflow.db`.             |
-| Webhooks to `/_sink/demo` fail     | Wrong port in the seeded URL             | The seed derives the sink URL from `PORT`; reseed after changing ports.         |
-| Reset returns `404`                | Demo mode or reset token is off          | Set `PAYFLOW_DEMO_MODE=true` and `PAYFLOW_DEMO_RESET_TOKEN`.                    |
-| Service sleeps or stops processing | Free plan or worker disabled             | Use Starter or higher and keep `PAYFLOW_WORKER_ENABLED=true`.                   |
+| Symptom                             | Likely cause                             | Fix                                                                                                     |
+| ----------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Build fails on `better-sqlite3`     | Missing native build tools               | The Dockerfile installs Python and a C++ toolchain; rebuild from the repo root.                         |
+| `demo_not_seeded`                   | Disk is empty or the key file is missing | Check logs for the seed step, then restart the service.                                                 |
+| Demo key stopped working            | Pepper changed on a new disk             | Restart so the entrypoint creates a new key, or run `seed:reset`.                                       |
+| Data disappears on deploy           | No disk mounted at `/data`               | Add the persistent disk and set `PAYFLOW_DB_PATH=/data/payflow.db`.                                     |
+| Seed fails with `EACCES` on `/data` | Disk mounted root-owned                  | The entrypoint chowns `/data` before dropping privileges; do not override the image user or entrypoint. |
+| Webhooks to `/_sink/demo` fail      | Wrong port in the seeded URL             | The seed derives the sink URL from `PORT`; reseed after changing ports.                                 |
+| Reset returns `404`                 | Demo mode or reset token is off          | Set `PAYFLOW_DEMO_MODE=true` and `PAYFLOW_DEMO_RESET_TOKEN`.                                            |
+| Service sleeps or stops processing  | Free plan or worker disabled             | Use Starter or higher and keep `PAYFLOW_WORKER_ENABLED=true`.                                           |
 
 ## Security notes
 
