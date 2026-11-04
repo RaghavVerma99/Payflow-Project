@@ -125,8 +125,9 @@ export function RefundsPage() {
               {refunds.map((refund, index) => (
                 <TableRow
                   key={refund.id}
-                  className="group cursor-pointer"
+                  className="group cursor-pointer animate-scale-in"
                   onClick={() => setPaymentId(refund.payment_id)}
+                  style={{ transitionDelay: `${index * 15}ms` }}
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">

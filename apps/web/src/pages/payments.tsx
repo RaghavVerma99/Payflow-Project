@@ -186,8 +186,9 @@ export function PaymentsPage() {
               {visible.map((payment, index) => (
                 <TableRow
                   key={payment.id}
-                  className="group cursor-pointer"
+                  className="group cursor-pointer animate-scale-in"
                   onClick={() => setDetailId(payment.id)}
+                  style={{ transitionDelay: `${index * 15}ms` }}
                 >
                   <TableCell>
                     <div className="flex items-start gap-3">

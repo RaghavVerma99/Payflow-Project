@@ -49,6 +49,83 @@ export function useAnimatedNumber(target: number, duration = 900): number {
   return value;
 }
 
+export function useSpringNumber(
+  target: number,
+  stiffness = 120,
+  damping = 18,
+): number {
+  const reduced = useReducedMotion();
+  const [value, setValue] = useState(reduced ? target : 0);
+  const velocity = useRef(0);
+  const previous = useRef(0);
+  const frame = useRef(0);
+
+  useEffect(() => {
+    if (reduced) {
+      setValue(target);
+      previous.current = target;
+      velocity.current = 0;
+      return;
+    }
+
+    const from = previous.current;
+    const start = performance.now();
+    let resolved = false;
+
+    const tick = (now: number) => {
+      const elapsed = (now - start) / 1000;
+      // Critically damped spring approximation
+      const progress = Math.min(1, elapsed * 2.2);
+      const spring =
+        1 -
+        Math.exp(-damping * elapsed) *
+          (Math.cos(stiffness * elapsed) +
+            (damping / stiffness) * Math.sin(stiffness * elapsed));
+      const next = from + (target - from) * spring;
+      setValue(next);
+      previous.current = next;
+
+      if (progress < 1 && !reduced) {
+        frame.current = requestAnimationFrame(tick);
+      } else if (!resolved) {
+        resolved = true;
+        setValue(target);
+        previous.current = target;
+      }
+    };
+
+    frame.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame.current);
+  }, [target, stiffness, damping, reduced]);
+
+  return value;
+}
+
+export function Stagger({
+  children,
+  delay = 60,
+  className,
+}: {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const items = Array.isArray(children) ? children : [children];
+  return (
+    <div className={cn("flex flex-col gap-2", className)}>
+      {items.map((child, index) => (
+        <div
+          key={index}
+          className="reveal"
+          style={{ transitionDelay: `${index * delay}ms` }}
+        >
+          {child}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Reveal({
   children,
   className,

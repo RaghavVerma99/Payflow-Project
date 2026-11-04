@@ -13,7 +13,7 @@ import {
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { ControlRoom } from "../components/control-room";
-import { useAnimatedNumber, Reveal } from "../components/motion";
+import { Stagger, useAnimatedNumber, Reveal } from "../components/motion";
 import { NewPaymentDialog } from "../components/payment-dialog";
 import { PaymentDetailDialog } from "../components/payment-detail";
 import { IdText, StatusBadge } from "../components/status";
@@ -351,121 +351,123 @@ export function OverviewPage() {
             />
           ))
         ) : (
-          <>
-            <Reveal className="md:col-span-5" delay={40}>
-              <Card className="hover-lift h-full p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="size-4 text-primary" />
-                    <span className="label-craft">Gross volume</span>
+          <Stagger delay={45}>
+            <>
+              <Reveal className="md:col-span-5">
+                <Card className="hover-lift h-full p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="size-4 text-primary" />
+                      <span className="label-craft">Gross volume</span>
+                    </div>
+                    <Badge variant="outline">INR</Badge>
                   </div>
-                  <Badge variant="outline">INR</Badge>
-                </div>
-                <p className="display mt-4 text-[38px] leading-none">
-                  {formatCompactCurrency(gross)}
-                </p>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  {formatNumber(overview.payments.total)} payments ·{" "}
-                  {formatCurrency(overview.volume.net_minor)} net of refunds
-                </p>
-                <Sparkline points={series} className="mt-3" />
-              </Card>
-            </Reveal>
+                  <p className="display mt-4 text-[38px] leading-none">
+                    {formatCompactCurrency(gross)}
+                  </p>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {formatNumber(overview.payments.total)} payments ·{" "}
+                    {formatCurrency(overview.volume.net_minor)} net of refunds
+                  </p>
+                  <Sparkline points={series} className="mt-3" />
+                </Card>
+              </Reveal>
 
-            <Reveal className="md:col-span-3 xl:col-span-2" delay={90}>
-              <Card className="hover-lift flex h-full flex-col justify-between p-5">
-                <div className="flex items-center gap-2">
-                  <ArrowUpRight className="size-4 text-emerald-500" />
-                  <span className="label-craft">Success</span>
-                </div>
-                <div className="flex items-end justify-between gap-2">
+              <Reveal className="md:col-span-3 xl:col-span-2">
+                <Card className="hover-lift flex h-full flex-col justify-between p-5">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpRight className="size-4 text-emerald-500" />
+                    <span className="label-craft">Success</span>
+                  </div>
+                  <div className="flex items-end justify-between gap-2">
+                    <div>
+                      <p className="display mt-4 text-[34px] leading-none">
+                        {formatPercent(rate)}
+                      </p>
+                      <p className="mt-2 text-[10px] text-muted-foreground">
+                        {overview.payments.succeeded} of{" "}
+                        {overview.payments.total} settled
+                      </p>
+                    </div>
+                    <RateRing rate={overview.payments.success_rate} />
+                  </div>
+                </Card>
+              </Reveal>
+
+              <Reveal className="md:col-span-4 xl:col-span-2">
+                <Card className="hover-lift flex h-full flex-col justify-between p-5">
+                  <div className="flex items-center gap-2">
+                    <RotateCcw className="size-4 text-violet-500" />
+                    <span className="label-craft">Refunded volume</span>
+                  </div>
                   <div>
                     <p className="display mt-4 text-[34px] leading-none">
-                      {formatPercent(rate)}
+                      {formatCompactCurrency(refunded)}
                     </p>
                     <p className="mt-2 text-[10px] text-muted-foreground">
-                      {overview.payments.succeeded} of {overview.payments.total}{" "}
-                      settled
+                      {overview.refunds.total} refunds ·{" "}
+                      {overview.refunds.succeeded} settled
                     </p>
-                  </div>
-                  <RateRing rate={overview.payments.success_rate} />
-                </div>
-              </Card>
-            </Reveal>
-
-            <Reveal className="md:col-span-4 xl:col-span-2" delay={140}>
-              <Card className="hover-lift flex h-full flex-col justify-between p-5">
-                <div className="flex items-center gap-2">
-                  <RotateCcw className="size-4 text-violet-500" />
-                  <span className="label-craft">Refunded volume</span>
-                </div>
-                <div>
-                  <p className="display mt-4 text-[34px] leading-none">
-                    {formatCompactCurrency(refunded)}
-                  </p>
-                  <p className="mt-2 text-[10px] text-muted-foreground">
-                    {overview.refunds.total} refunds ·{" "}
-                    {overview.refunds.succeeded} settled
-                  </p>
-                  <div className="mt-3 h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-violet-500"
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          overview.volume.gross_minor > 0
-                            ? (overview.volume.refunded_minor /
-                                overview.volume.gross_minor) *
-                                100
-                            : 0,
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              </Card>
-            </Reveal>
-
-            <Reveal className="md:col-span-12 xl:col-span-3" delay={190}>
-              <Card className="hover-lift flex h-full flex-col justify-between p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <Scale className="size-4 text-primary" />
-                    <span className="label-craft">Ledger</span>
-                  </div>
-                  <Badge
-                    variant={overview.ledger.balanced ? "success" : "danger"}
-                  >
-                    {overview.ledger.balanced ? "Balanced" : "Review"}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="display mt-4 text-[28px] leading-none">
-                    {formatCompactCurrency(overview.ledger.debits_minor)}
-                  </p>
-                  <p className="mt-2 text-[10px] text-muted-foreground">
-                    debits = credits · {overview.ledger.accounts.length}{" "}
-                    accounts
-                  </p>
-                  <div className="mt-3 space-y-1.5">
-                    {overview.ledger.accounts.map((account) => (
+                    <div className="mt-3 h-1 overflow-hidden rounded-full bg-muted">
                       <div
-                        key={account.id}
-                        className="flex items-center justify-between text-[10px]"
-                      >
-                        <span className="truncate text-muted-foreground">
-                          {account.name}
-                        </span>
-                        <span className="tabular ml-2 font-medium">
-                          {formatCurrency(account.balance_minor)}
-                        </span>
-                      </div>
-                    ))}
+                        className="h-full rounded-full bg-violet-500"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            overview.volume.gross_minor > 0
+                              ? (overview.volume.refunded_minor /
+                                  overview.volume.gross_minor) *
+                                  100
+                              : 0,
+                          )}%`,
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </Reveal>
-          </>
+                </Card>
+              </Reveal>
+
+              <Reveal className="md:col-span-12 xl:col-span-3">
+                <Card className="hover-lift flex h-full flex-col justify-between p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Scale className="size-4 text-primary" />
+                      <span className="label-craft">Ledger</span>
+                    </div>
+                    <Badge
+                      variant={overview.ledger.balanced ? "success" : "danger"}
+                    >
+                      {overview.ledger.balanced ? "Balanced" : "Review"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="display mt-4 text-[28px] leading-none">
+                      {formatCompactCurrency(overview.ledger.debits_minor)}
+                    </p>
+                    <p className="mt-2 text-[10px] text-muted-foreground">
+                      debits = credits · {overview.ledger.accounts.length}{" "}
+                      accounts
+                    </p>
+                    <div className="mt-3 space-y-1.5">
+                      {overview.ledger.accounts.map((account) => (
+                        <div
+                          key={account.id}
+                          className="flex items-center justify-between text-[10px]"
+                        >
+                          <span className="truncate text-muted-foreground">
+                            {account.name}
+                          </span>
+                          <span className="tabular ml-2 font-medium">
+                            {formatCurrency(account.balance_minor)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              </Reveal>
+            </>
+          </Stagger>
         )}
       </div>
 
@@ -474,243 +476,253 @@ export function OverviewPage() {
       </Reveal>
 
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        <Reveal className="xl:col-span-2">
-          <Card className="h-full">
-            <CardHeader className="flex-row items-start justify-between space-y-0">
-              <div>
-                <span className="label-craft">Last 14 days</span>
-                <CardTitle className="mt-2 text-[22px]">
-                  The daily flow
-                </CardTitle>
+        <Stagger delay={70}>
+          <Reveal className="xl:col-span-2">
+            <Card className="h-full">
+              <CardHeader className="flex-row items-start justify-between space-y-0">
+                <div>
+                  <span className="label-craft">Last 14 days</span>
+                  <CardTitle className="mt-2 text-[22px]">
+                    The daily flow
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Daily successful payment volume.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="display text-2xl leading-none">
+                    {formatCompactCurrency(windowVolume)}
+                  </p>
+                  <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.16em] text-muted-foreground/70">
+                    window total
+                  </p>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-5">
+                {timeseriesQuery.isLoading ? (
+                  <Skeleton className="h-[268px] w-full" />
+                ) : (
+                  <VolumeChart data={series} />
+                )}
+              </CardContent>
+            </Card>
+          </Reveal>
+
+          <Reveal delay={80}>
+            <Card className="flex h-full flex-col">
+              <CardHeader>
+                <span className="label-craft">Distribution</span>
+                <CardTitle className="mt-2 text-[22px]">Payment mix</CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Daily successful payment volume.
+                  Payments grouped by current status.
                 </p>
-              </div>
-              <div className="text-right">
-                <p className="display text-2xl leading-none">
-                  {formatCompactCurrency(windowVolume)}
-                </p>
-                <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.16em] text-muted-foreground/70">
-                  window total
-                </p>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-5">
-              {timeseriesQuery.isLoading ? (
-                <Skeleton className="h-[268px] w-full" />
-              ) : (
-                <VolumeChart data={series} />
-              )}
-            </CardContent>
-          </Card>
-        </Reveal>
-
-        <Reveal delay={80}>
-          <Card className="flex h-full flex-col">
-            <CardHeader>
-              <span className="label-craft">Distribution</span>
-              <CardTitle className="mt-2 text-[22px]">Payment mix</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Payments grouped by current status.
-              </p>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col pt-5">
-              <div className="flex h-3 overflow-hidden rounded-full bg-muted">
-                {byStatus.map(([status, count]) => (
-                  <div
-                    key={status}
-                    className={cn(
-                      "h-full transition-all duration-700",
-                      STATUS_COLORS[status] ?? "bg-zinc-400",
-                    )}
-                    style={{ width: `${(count / totalPayments) * 100}%` }}
-                    title={`${status}: ${count}`}
-                  />
-                ))}
-              </div>
-
-              <div className="mt-5 flex-1 space-y-3">
-                {byStatus.length > 0 ? (
-                  byStatus.map(([status, count]) => (
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col pt-5">
+                <div className="flex h-3 overflow-hidden rounded-full bg-muted">
+                  {byStatus.map(([status, count]) => (
                     <div
                       key={status}
-                      className="flex items-center gap-2.5 text-[11px]"
-                    >
-                      <span
-                        className={cn(
-                          "size-1.5 shrink-0 rounded-full",
-                          STATUS_COLORS[status] ?? "bg-zinc-400",
-                        )}
-                      />
-                      <span className="flex-1 capitalize text-muted-foreground">
-                        {status.replace(/_/g, " ")}
-                      </span>
-                      <span className="tabular font-medium">{count}</span>
-                      <span className="tabular w-9 text-right text-[9px] text-muted-foreground/60">
-                        {formatPercent(count / totalPayments, 0)}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="py-8 text-center text-xs text-muted-foreground">
-                    No payments yet.
-                  </p>
-                )}
-              </div>
+                      className={cn(
+                        "h-full transition-all duration-700",
+                        STATUS_COLORS[status] ?? "bg-zinc-400",
+                      )}
+                      style={{ width: `${(count / totalPayments) * 100}%` }}
+                      title={`${status}: ${count}`}
+                    />
+                  ))}
+                </div>
 
-              <div className="mt-5 flex items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5">
-                <span className="text-[10px] text-muted-foreground">
-                  Worker queue
-                </span>
-                <span className="font-mono text-[10px]">
-                  {Object.values(overview?.jobs ?? {}).reduce(
-                    (sum, count) => sum + count,
-                    0,
-                  )}{" "}
-                  jobs
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </Reveal>
+                <div className="mt-5 flex-1 space-y-3">
+                  {byStatus.length > 0 ? (
+                    byStatus.map(([status, count]) => (
+                      <div
+                        key={status}
+                        className="flex items-center gap-2.5 text-[11px]"
+                      >
+                        <span
+                          className={cn(
+                            "size-1.5 shrink-0 rounded-full",
+                            STATUS_COLORS[status] ?? "bg-zinc-400",
+                          )}
+                        />
+                        <span className="flex-1 capitalize text-muted-foreground">
+                          {status.replace(/_/g, " ")}
+                        </span>
+                        <span className="tabular font-medium">{count}</span>
+                        <span className="tabular w-9 text-right text-[9px] text-muted-foreground/60">
+                          {formatPercent(count / totalPayments, 0)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="py-8 text-center text-xs text-muted-foreground">
+                      No payments yet.
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-5 flex items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5">
+                  <span className="text-[10px] text-muted-foreground">
+                    Worker queue
+                  </span>
+                  <span className="font-mono text-[10px]">
+                    {Object.values(overview?.jobs ?? {}).reduce(
+                      (sum, count) => sum + count,
+                      0,
+                    )}{" "}
+                    jobs
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </Reveal>
+        </Stagger>
       </div>
 
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        <Reveal className="xl:col-span-2">
-          <Card className="h-full overflow-hidden">
-            <CardHeader className="flex-row items-start justify-between space-y-0">
-              <div>
-                <span className="label-craft">Activity</span>
-                <CardTitle className="mt-2 text-[22px]">
-                  Recent payments
-                </CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Select a payment to view its details.
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/payments">
-                  View all
-                  <ArrowRight className="size-3.5" />
-                </Link>
-              </Button>
-            </CardHeader>
-
-            <div className="mt-4 divide-y divide-border/60">
-              {overview?.recent_payments.map((payment, index) => (
-                <button
-                  key={payment.id}
-                  type="button"
-                  onClick={() => setDetailId(payment.id)}
-                  className="row-craft flex w-full items-center gap-3 px-5 py-3.5 text-left"
-                >
-                  <span className="row-index w-6 shrink-0 font-mono text-[9px] text-muted-foreground/30">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[12px] font-medium">
-                      {payment.description ?? "Payment"}
-                    </p>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      <IdText id={payment.id} />
-                      <span className="font-mono text-[8px] text-muted-foreground/50">
-                        {payment.customer_id ?? "anonymous"}
-                      </span>
-                    </div>
-                  </div>
-                  <StatusBadge status={payment.status} />
-                  <div className="hidden text-right sm:block">
-                    <p className="display text-[16px] leading-none">
-                      {formatCurrency(payment.amount_minor)}
-                    </p>
-                    <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.1em] text-muted-foreground/60">
-                      {relativeTime(payment.created_at)}
-                    </p>
-                  </div>
-                  <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground/40" />
-                </button>
-              ))}
-            </div>
-
-            {overview && overview.recent_payments.length === 0 ? (
-              <div className="px-5 py-12 text-center">
-                <p className="text-base font-semibold">No payments yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Create a payment to see the full lifecycle in the console.
-                </p>
-                <Button
-                  className="mt-4"
-                  size="sm"
-                  onClick={() => setNewOpen(true)}
-                >
-                  <Plus className="size-3.5" />
-                  Create payment
+        <Stagger delay={70}>
+          <Reveal className="xl:col-span-2">
+            <Card className="h-full overflow-hidden">
+              <CardHeader className="flex-row items-start justify-between space-y-0">
+                <div>
+                  <span className="label-craft">Activity</span>
+                  <CardTitle className="mt-2 text-[22px]">
+                    Recent payments
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Select a payment to view its details.
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/payments">
+                    View all
+                    <ArrowRight className="size-3.5" />
+                  </Link>
                 </Button>
-              </div>
-            ) : null}
-          </Card>
-        </Reveal>
+              </CardHeader>
 
-        <Reveal delay={80}>
-          <Card className="flex h-full flex-col">
-            <CardHeader className="flex-row items-start justify-between space-y-0">
-              <div>
-                <span className="label-craft">Accounting</span>
-                <CardTitle className="mt-2 text-[22px]">
-                  Ledger balances
-                </CardTitle>
-              </div>
-              <Badge variant={overview?.ledger.balanced ? "success" : "danger"}>
-                {overview?.ledger.balanced ? "Balanced" : "Review"}
-              </Badge>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col space-y-2.5 pt-4">
-              {overview?.ledger.accounts.map((account) => (
-                <div
-                  key={account.id}
-                  className="rounded-xl border border-border/70 bg-background/20 p-3.5 transition-colors hover:border-primary/25"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-[11px] font-medium">{account.name}</p>
-                      <p className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.12em] text-muted-foreground/60">
-                        {account.code}
+              <div className="mt-4 divide-y divide-border/60">
+                {overview?.recent_payments.map((payment, index) => (
+                  <button
+                    key={payment.id}
+                    type="button"
+                    onClick={() => setDetailId(payment.id)}
+                    className="row-craft flex w-full items-center gap-3 px-5 py-3.5 text-left"
+                  >
+                    <span className="row-index w-6 shrink-0 font-mono text-[9px] text-muted-foreground/30">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12px] font-medium">
+                        {payment.description ?? "Payment"}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <IdText id={payment.id} />
+                        <span className="font-mono text-[8px] text-muted-foreground/50">
+                          {payment.customer_id ?? "anonymous"}
+                        </span>
+                      </div>
+                    </div>
+                    <StatusBadge status={payment.status} />
+                    <div className="hidden text-right sm:block">
+                      <p className="display text-[16px] leading-none">
+                        {formatCurrency(payment.amount_minor)}
+                      </p>
+                      <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.1em] text-muted-foreground/60">
+                        {relativeTime(payment.created_at)}
                       </p>
                     </div>
-                    <Badge variant="outline" className="capitalize">
-                      {account.kind}
-                    </Badge>
-                  </div>
-                  <p className="display mt-2 text-[24px] leading-none">
-                    {formatCurrency(account.balance_minor)}
-                  </p>
-                  <div className="mt-2 flex gap-4 font-mono text-[8px] uppercase tracking-[0.08em] text-muted-foreground">
-                    <span>Dr {formatCurrency(account.debits_minor)}</span>
-                    <span>Cr {formatCurrency(account.credits_minor)}</span>
-                  </div>
-                </div>
-              ))}
-
-              <div className="mt-auto rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3.5">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-500" />
-                  <p className="text-[11px] font-medium">Trial balance holds</p>
-                </div>
-                <p className="tabular mt-1.5 font-mono text-[9px] text-muted-foreground">
-                  {formatCurrency(overview?.ledger.debits_minor ?? 0)} ={" "}
-                  {formatCurrency(overview?.ledger.credits_minor ?? 0)}
-                </p>
+                    <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground/40" />
+                  </button>
+                ))}
               </div>
 
-              <Button variant="outline" size="sm" className="w-full" asChild>
-                <Link to="/ledger">
-                  Inspect the journals
-                  <ArrowRight className="size-3.5" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </Reveal>
+              {overview && overview.recent_payments.length === 0 ? (
+                <div className="px-5 py-12 text-center">
+                  <p className="text-base font-semibold">No payments yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Create a payment to see the full lifecycle in the console.
+                  </p>
+                  <Button
+                    className="mt-4"
+                    size="sm"
+                    onClick={() => setNewOpen(true)}
+                  >
+                    <Plus className="size-3.5" />
+                    Create payment
+                  </Button>
+                </div>
+              ) : null}
+            </Card>
+          </Reveal>
+
+          <Reveal delay={80}>
+            <Card className="flex h-full flex-col">
+              <CardHeader className="flex-row items-start justify-between space-y-0">
+                <div>
+                  <span className="label-craft">Accounting</span>
+                  <CardTitle className="mt-2 text-[22px]">
+                    Ledger balances
+                  </CardTitle>
+                </div>
+                <Badge
+                  variant={overview?.ledger.balanced ? "success" : "danger"}
+                >
+                  {overview?.ledger.balanced ? "Balanced" : "Review"}
+                </Badge>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col space-y-2.5 pt-4">
+                {overview?.ledger.accounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="rounded-xl border border-border/70 bg-background/20 p-3.5 transition-colors hover:border-primary/25"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[11px] font-medium">
+                          {account.name}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.12em] text-muted-foreground/60">
+                          {account.code}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="capitalize">
+                        {account.kind}
+                      </Badge>
+                    </div>
+                    <p className="display mt-2 text-[24px] leading-none">
+                      {formatCurrency(account.balance_minor)}
+                    </p>
+                    <div className="mt-2 flex gap-4 font-mono text-[8px] uppercase tracking-[0.08em] text-muted-foreground">
+                      <span>Dr {formatCurrency(account.debits_minor)}</span>
+                      <span>Cr {formatCurrency(account.credits_minor)}</span>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="mt-auto rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="size-4 text-emerald-500" />
+                    <p className="text-[11px] font-medium">
+                      Trial balance holds
+                    </p>
+                  </div>
+                  <p className="tabular mt-1.5 font-mono text-[9px] text-muted-foreground">
+                    {formatCurrency(overview?.ledger.debits_minor ?? 0)} ={" "}
+                    {formatCurrency(overview?.ledger.credits_minor ?? 0)}
+                  </p>
+                </div>
+
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <Link to="/ledger">
+                    Inspect the journals
+                    <ArrowRight className="size-3.5" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </Reveal>
+        </Stagger>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/60 bg-background/20 px-4 py-3 text-[10px] text-muted-foreground">
