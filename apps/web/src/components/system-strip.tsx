@@ -35,37 +35,33 @@ export function SystemStrip() {
   const workerEnabled = health?.checks.worker === "enabled";
 
   return (
-    <div className="relative z-10 border-b border-border/50 bg-background/25 backdrop-blur-sm">
-      <div className="mx-auto flex w-full max-w-[1480px] items-center gap-4 overflow-x-auto px-4 py-1.5 sm:px-6 lg:px-9">
-        <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground/60">
+    <div className="relative z-10 border-b border-border/70 bg-card/35">
+      <div className="mx-auto flex w-full max-w-[1480px] items-center gap-2.5 overflow-x-auto px-4 py-2 sm:gap-3 sm:px-6 lg:px-9">
+        <span className="mr-1 flex shrink-0 items-center gap-1.5 font-mono text-[8px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
           <ServerCog className="size-3" />
           system
         </span>
 
-        <span className="h-3 w-px bg-border" />
-
-        <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/80 bg-background/65 px-2.5 py-1 font-mono text-[8px] uppercase tracking-[0.1em] text-muted-foreground">
           <span
             className={`size-1.5 rounded-full ${dbHealthy ? "bg-emerald-500 animate-glow-pulse" : "bg-amber-500"}`}
           />
           db {health?.checks.database ?? "…"}
         </span>
 
-        <span className="h-3 w-px bg-border" />
-
-        <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/80 bg-background/65 px-2.5 py-1 font-mono text-[8px] uppercase tracking-[0.1em] text-muted-foreground">
           <span
             className={`size-1.5 rounded-full ${workerEnabled ? "bg-emerald-500 animate-glow-pulse" : "bg-amber-500"}`}
           />
           worker {health?.checks.worker ?? "…"}
         </span>
 
-        <span className="hidden items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground sm:flex">
+        <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-border/80 bg-background/65 px-2.5 py-1 font-mono text-[8px] uppercase tracking-[0.1em] text-muted-foreground sm:flex">
           <Activity className="size-3" />
           queue {health?.queue_depth ?? "…"}
         </span>
 
-        <span className="hidden items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground md:flex">
+        <span className="hidden min-w-0 items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.1em] text-muted-foreground/80 md:flex">
           <Database className="size-3" />
           {lastEvent ? (
             <>

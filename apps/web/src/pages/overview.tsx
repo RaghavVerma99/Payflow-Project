@@ -166,7 +166,7 @@ function LivePulse({
   const queue = Object.values(jobs).reduce((sum, count) => sum + count, 0);
 
   return (
-    <div className="relative w-full max-w-[19rem] overflow-hidden rounded-2xl border border-border/80 bg-background/35 p-4 backdrop-blur-sm">
+    <div className="surface-outline relative w-full max-w-[19rem] overflow-hidden rounded-xl p-4">
       <div className="flex items-center justify-between">
         <span className="label-craft">Latest activity</span>
         <span className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
@@ -258,19 +258,20 @@ export function OverviewPage() {
     <div>
       <Reveal>
         <Card className="relative overflow-hidden border-border shadow-sm">
-          <div className="pointer-events-none absolute right-0 top-0 h-full w-[38%] bg-gradient-to-l from-primary/[0.07] to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-[38%] border-l border-primary/[0.07] bg-primary/[0.025] [mask-image:linear-gradient(to_left,black,transparent)]" />
           <div className="relative flex flex-col gap-7 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-2xl flex-1">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <Sparkles className="size-3.5 text-primary" />
-                <span className="label-craft">Payment operations</span>
-                <span className="h-px w-8 bg-border" />
-                <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-muted-foreground/60">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="pill-gloss inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[0.08] px-2.5 py-1 font-mono text-[8px] font-semibold uppercase tracking-[0.1em] text-primary">
+                  <Sparkles className="size-3" />
+                  Operations
+                </span>
+                <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-muted-foreground/65">
                   {TODAY}
                 </span>
               </div>
-              <h1 className="mt-4 max-w-xl text-[36px] font-semibold leading-[1.05] tracking-[-0.05em] sm:text-[48px]">
-                Payment operations,
+              <h1 className="section-heading mt-5 max-w-xl text-[34px] leading-[1.08] sm:text-[43px]">
+                Every payment,
                 <br />
                 <span className="text-primary">in clear view.</span>
               </h1>

@@ -7,16 +7,16 @@ import * as React from "react";
 import { cn } from "../lib/utils";
 
 const buttonVariants = cva(
-  "pressable inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-[13px] font-medium tracking-[-0.01em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "pressable inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-[13px] font-medium tracking-[-0.01em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_12px_26px_-16px_var(--primary)] hover:bg-primary/90",
+          "pill-gloss bg-primary text-primary-foreground hover:bg-primary/90",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+          "pill-gloss bg-secondary text-secondary-foreground hover:bg-secondary/80",
         outline:
-          "border border-border bg-background/30 backdrop-blur-sm hover:border-primary/35 hover:bg-accent/50 hover:text-accent-foreground",
+          "pill-gloss border border-border bg-background/45 backdrop-blur-sm hover:border-primary/35 hover:bg-accent/50 hover:text-accent-foreground",
         ghost: "hover:bg-accent/60 hover:text-accent-foreground",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
@@ -61,7 +61,7 @@ export function Card({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("art-card rounded-2xl text-card-foreground", className)}
+      className={cn("art-card rounded-xl text-card-foreground", className)}
       {...props}
     />
   );
@@ -140,7 +140,7 @@ export const Input = React.forwardRef<
     type={type}
     ref={ref}
     className={cn(
-      "flex h-9 w-full rounded-xl border border-input bg-background/45 px-3 py-1 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors placeholder:text-muted-foreground/60 hover:border-foreground/25 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
+      "flex h-9 w-full rounded-lg border border-input bg-background/60 px-3 py-1 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors placeholder:text-muted-foreground/60 hover:border-foreground/25 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
       className,
     )}
     {...props}
@@ -155,7 +155,7 @@ export const Textarea = React.forwardRef<
   <textarea
     ref={ref}
     className={cn(
-      "flex min-h-24 w-full rounded-xl border border-input bg-background/45 px-3 py-2 font-mono text-xs leading-relaxed shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors placeholder:text-muted-foreground/60 hover:border-foreground/25 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
+      "flex min-h-24 w-full rounded-lg border border-input bg-background/60 px-3 py-2 font-mono text-xs leading-relaxed shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors placeholder:text-muted-foreground/60 hover:border-foreground/25 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
       className,
     )}
     {...props}
@@ -170,7 +170,7 @@ export const Select = React.forwardRef<
   <select
     ref={ref}
     className={cn(
-      "flex h-9 w-full appearance-none rounded-xl border border-input bg-background/45 px-3 py-1 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors hover:border-foreground/25 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
+      "flex h-9 w-full appearance-none rounded-lg border border-input bg-background/60 px-3 py-1 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors hover:border-foreground/25 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-50",
       className,
     )}
     {...props}

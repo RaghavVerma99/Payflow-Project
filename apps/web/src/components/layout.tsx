@@ -107,9 +107,9 @@ function NavItem({
       onClick={onClick}
       className={({ isActive }) =>
         cn(
-          "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors duration-150",
+          "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all duration-200",
           isActive
-            ? "bg-primary/10 text-foreground"
+            ? "bg-primary/[0.09] text-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary)_14%,transparent)]"
             : "text-muted-foreground hover:bg-muted hover:text-foreground",
         )
       }
@@ -295,7 +295,7 @@ export function AppShell() {
       <Sidebar open={open} onClose={() => setOpen(false)} />
 
       <div className="relative z-10 lg:pl-[15.5rem]">
-        <header className="sticky top-0 z-30 flex h-[64px] items-center gap-3 border-b border-border bg-card/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-30 flex h-[68px] items-center gap-3 border-b border-border bg-card/95 px-4 sm:px-6 lg:px-8">
           <Button
             variant="ghost"
             size="icon"
@@ -316,15 +316,15 @@ export function AppShell() {
             </span>
           </div>
 
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="pill-gloss hidden items-center gap-2 rounded-full border border-border bg-background/75 px-3 py-1.5 md:flex">
             <span className="relative flex size-1.5">
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-50" />
               <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
             </span>
-            <LiveClock className="text-muted-foreground/70" />
+            <LiveClock className="text-[9px] font-semibold tracking-[0.09em] text-muted-foreground" />
           </div>
 
-          <div className="hidden items-center gap-1.5 rounded-md border border-amber-500/25 bg-amber-500/8 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-800 dark:text-amber-300 sm:flex">
+          <div className="pill-gloss hidden items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/[0.08] px-3 py-1.5 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-800 dark:text-amber-300 sm:flex">
             {merchant?.environment ?? "dev"} environment
           </div>
 
@@ -334,6 +334,7 @@ export function AppShell() {
             onClick={toggle}
             title="Toggle theme"
             aria-label="Toggle theme"
+            className="pill-gloss rounded-full border border-border bg-card"
           >
             {theme === "dark" ? (
               <Sun className="size-4" />
@@ -354,7 +355,7 @@ export function AppShell() {
             </a>
           </Button>
 
-          <kbd className="hidden items-center gap-1 rounded-lg border border-border bg-muted/30 px-2 py-1 font-mono text-[9px] text-muted-foreground/80 lg:inline-flex">
+          <kbd className="hidden items-center gap-1 rounded-full border border-border bg-muted/50 px-3 py-1.5 font-mono text-[9px] text-muted-foreground/80 lg:inline-flex">
             <span>⌘</span>K
           </kbd>
         </header>
