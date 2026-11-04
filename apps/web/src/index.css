@@ -144,7 +144,12 @@
     width: 3px;
     content: "";
     pointer-events: none;
-    background: linear-gradient(180deg, transparent, var(--primary), transparent);
+    background: linear-gradient(
+      180deg,
+      transparent,
+      var(--primary),
+      transparent
+    );
     opacity: 0.55;
   }
 
