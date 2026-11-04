@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Radio, ServerCog } from "lucide-react";
+import { Activity, Database, Radio, ServerCog } from "lucide-react";
 import { api } from "../lib/api";
 import { relativeTime } from "../lib/utils";
 
@@ -31,6 +31,9 @@ export function SystemStrip() {
   const health = healthQuery.data;
   const lastEvent = eventsQuery.data?.data?.[0];
 
+  const dbHealthy = health?.checks.database === "ok";
+  const workerEnabled = health?.checks.worker === "enabled";
+
   return (
     <div className="relative z-10 border-b border-border/50 bg-background/25 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-[1480px] items-center gap-4 overflow-x-auto px-4 py-1.5 sm:px-6 lg:px-9">
@@ -43,11 +46,16 @@ export function SystemStrip() {
 
         <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
           <span
-            className={`size-1.5 rounded-full ${
-              health?.checks.worker === "enabled"
-                ? "bg-emerald-500"
-                : "bg-amber-500"
-            }`}
+            className={`size-1.5 rounded-full ${dbHealthy ? "bg-emerald-500 animate-glow-pulse" : "bg-amber-500"}`}
+          />
+          db {health?.checks.database ?? "…"}
+        </span>
+
+        <span className="h-3 w-px bg-border" />
+
+        <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+          <span
+            className={`size-1.5 rounded-full ${workerEnabled ? "bg-emerald-500 animate-glow-pulse" : "bg-amber-500"}`}
           />
           worker {health?.checks.worker ?? "…"}
         </span>
@@ -58,7 +66,7 @@ export function SystemStrip() {
         </span>
 
         <span className="hidden items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground md:flex">
-          <Radio className="size-3" />
+          <Database className="size-3" />
           {lastEvent ? (
             <>
               {lastEvent.type.replace(/[._]/g, " ")}{" "}

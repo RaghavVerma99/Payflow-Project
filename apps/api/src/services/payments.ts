@@ -298,7 +298,10 @@ export function transitionPayment(
     .run();
 
   if (result.changes !== 1) {
-    return tx.select().from(payments).where(eq(payments.id, paymentId)).get()!;
+    throw errors.conflict(
+      "Payment was updated by another process. Please retry.",
+      "payment_concurrent_update",
+    );
   }
 
   addPaymentEvent(

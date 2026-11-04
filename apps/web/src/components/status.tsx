@@ -131,9 +131,24 @@ export function StatusBadge({
   const Icon = style.icon;
 
   return (
-    <Badge variant={style.variant} className={cn("gap-1", className)}>
-      <Icon className={cn("size-3", style.spin && "animate-spin")} />
-      {style.label}
+    <Badge
+      variant={style.variant}
+      className={cn(
+        "gap-1 relative overflow-hidden",
+        style.spin && "animate-pulse",
+        className,
+      )}
+    >
+      <span className="flex items-center gap-1.5">
+        <Icon className={cn("size-3", style.spin && "animate-spin")} />
+        {style.label}
+      </span>
+      {style.variant === "success" && (
+        <span
+          className="absolute inset-0 bg-emerald-500/20 animate-ping rounded-full"
+          aria-hidden
+        />
+      )}
     </Badge>
   );
 }
