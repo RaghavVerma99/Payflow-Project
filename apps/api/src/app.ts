@@ -159,6 +159,16 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
     max: config.rateLimitMax,
     timeWindow: "1 minute",
     allowList: [],
+    keyGenerator: (request) => {
+      const forwarded = request.headers["x-forwarded-for"];
+      if (config.env === "production" && Array.isArray(forwarded)) {
+        return forwarded[0].split(",")[0].trim();
+      }
+      if (config.env === "production" && typeof forwarded === "string") {
+        return forwarded.split(",")[0].trim();
+      }
+      return request.ip;
+    },
   });
   void app.register(swagger, {
     openapi: {

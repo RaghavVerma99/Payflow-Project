@@ -920,7 +920,12 @@ async function deliverWebhook(
   ctx.db
     .update(webhookEvents)
     .set({
-      status: failures > 0 ? "failed" : "delivered",
+      status:
+        failures === 0
+          ? "delivered"
+          : failures === endpoints.length
+            ? "failed"
+            : "partially_delivered",
       attempts: attempt,
       lastError,
       updatedAt: nowIso(),
@@ -930,7 +935,7 @@ async function deliverWebhook(
 
   if (failures > 0) {
     throw new Error(
-      `Webhook event ${eventId} failed on ${failures} endpoint(s): ${lastError ?? "unknown error"}`,
+      `Webhook event ${eventId} failed on ${failures} of ${endpoints.length} endpoint(s): ${lastError ?? "unknown error"}`,
     );
   }
 }

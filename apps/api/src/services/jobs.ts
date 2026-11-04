@@ -445,7 +445,7 @@ export function retryDeadJob(
 
       if (job.kind === "deliver_webhooks" && job.aggregateId) {
         t.update(webhookEvents)
-          .set({ status: "failed", lastError: null, updatedAt: nowIso() })
+          .set({ status: "pending", lastError: null, updatedAt: nowIso() })
           .where(eq(webhookEvents.id, job.aggregateId))
           .run();
       }

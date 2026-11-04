@@ -23,8 +23,6 @@ export interface AppConfig {
   logLevel: string;
 }
 
-const DEV_PEPPER = "dev-pepper-change-me";
-
 export const repoRoot = path.resolve(import.meta.dirname, "../../..");
 
 function resolveDbPath(value: string | undefined): string {
@@ -97,7 +95,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       65535,
     ),
     dbPath: resolveDbPath(process.env.PAYFLOW_DB_PATH),
-    apiKeyPepper: process.env.PAYFLOW_API_KEY_PEPPER ?? DEV_PEPPER,
+    apiKeyPepper: process.env.PAYFLOW_API_KEY_PEPPER ?? "",
     workerEnabled: bool(process.env.PAYFLOW_WORKER_ENABLED, env !== "test"),
     workerPollMs: int(
       "PAYFLOW_WORKER_POLL_MS",
@@ -192,7 +190,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     if (origins.includes(true) || origins.includes("*")) {
       throw new Error("Production CORS must use an explicit origin.");
     }
-    if (!config.apiKeyPepper.trim() || config.apiKeyPepper === DEV_PEPPER) {
+    if (!config.apiKeyPepper.trim()) {
       throw new Error("PAYFLOW_API_KEY_PEPPER must be set in production");
     }
     if (config.allowSimulatorControls && !config.demoMode) {

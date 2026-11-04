@@ -57,6 +57,12 @@ export function createPayment(
   if (!Number.isInteger(input.amountMinor) || input.amountMinor <= 0) {
     throw errors.invalid("amount_minor must be a positive integer.");
   }
+  if (input.amountMinor > 1_000_000_000) {
+    throw errors.invalid(
+      "amount_minor exceeds the simulator limit.",
+      "amount_exceeds_limit",
+    );
+  }
 
   const scenario = parseScenario(input.scenario);
   const requestHash = sha256(

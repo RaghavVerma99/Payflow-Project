@@ -59,7 +59,8 @@ export const webhookRoutes: FastifyPluginAsyncZod = async (app) => {
         merchantId: request.merchant.id,
         url: request.body.url,
         description: request.body.description ?? null,
-        allowPrivateHosts: app.config.env !== "production",
+        allowPrivateHosts:
+          app.config.demoMode || app.config.env !== "production",
       });
 
       return reply

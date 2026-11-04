@@ -143,7 +143,7 @@ export function createDb(dbPath: string): DbHandle {
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
   sqlite.pragma("busy_timeout = 30000");
-  sqlite.pragma("synchronous = NORMAL");
+  sqlite.pragma("synchronous = FULL");
   sqlite.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,
     applied_at TEXT NOT NULL
