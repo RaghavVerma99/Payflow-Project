@@ -11,11 +11,6 @@ export interface PayoutAvailability {
   available_minor: number;
 }
 
-/**
- * Payout availability is derived from the ledger and the resource states that
- * have not reached the ledger yet. Keeping it derived means old pending rows
- * become holds automatically and there is no separate hold balance to drift.
- */
 export function payoutAvailability(
   db: Db,
   merchantId: string,

@@ -83,11 +83,6 @@ const ATTENTION_KINDS: Partial<
   reconcile_payout: "payouts",
 };
 
-/**
- * Dead jobs mean the resource is stuck in a non-terminal state and will never
- * progress on its own. Flag the resource so operators can see and retry it
- * instead of leaving it silently orphaned.
- */
 export function markJobAggregateForAttention(
   tx: Db,
   kind: JobKind,

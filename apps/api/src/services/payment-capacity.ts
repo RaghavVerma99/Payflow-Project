@@ -10,10 +10,6 @@ export interface PaymentCapacity {
   remaining_minor: number;
 }
 
-/**
- * The amount already committed to customer remediation. Open disputes hold
- * capacity; lost disputes have already consumed it. Won disputes do not.
- */
 export function committedMinor(db: Db, paymentId: string): number {
   const row = db
     .select({

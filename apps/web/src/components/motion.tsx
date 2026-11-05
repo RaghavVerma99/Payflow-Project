@@ -74,7 +74,6 @@ export function useSpringNumber(
 
     const tick = (now: number) => {
       const elapsed = (now - start) / 1000;
-      // Critically damped spring approximation
       const progress = Math.min(1, elapsed * 2.2);
       const spring =
         1 -

@@ -6,10 +6,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createDb } from "./db";
 import { SCHEMA_SQL } from "./schema-sql";
 
-/**
- * Rebuild the schema as it looked before migration 2 so the upgrade path and
- * the dead-job backfill are exercised against a real version 1 database.
- */
 function legacySchemaSql(): string {
   return SCHEMA_SQL.split("\n")
     .filter(
